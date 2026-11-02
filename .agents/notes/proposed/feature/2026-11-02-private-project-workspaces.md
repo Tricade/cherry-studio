@@ -24,6 +24,8 @@ Add projects containing reusable agent memberships, instructions, a workspace an
 
 Each project owns one registered user workspace, which cannot be reassigned after creation. Forks and agent-created child sessions keep the project and require current team membership. Removing a member retains history but disables new turns until re-added. Identity and memory live separately per project and Agent under `Data/Projects/<projectId>/<agentId>`; only instructions, workspace files and selected KBs are shared. Connections reconcile edited project facts at the next turn, and project follow-ups queue rather than steer. Project and workspace deletion refuse live or trashed session references; external workspace files are retained. Orphan sweep reclaims unreferenced internal project memory with the existing freshness and restore safeguards. Full backups include that memory; slim backups omit it, while both retain project definitions and history. These rules scope automatically supplied context, not explicit external tools or filesystem permissions.
 
+The owner additionally requested provider model limits and safe Pi transport recovery. Preserve valid provider-reported input/output limits through listing and storage without replacing explicit user overrides or adding input and output limits into an invented context window. Pi transport retries remain native before visible output; after nonempty text/reasoning or a started tool, stop on failure while preserving the partial result. Restore the previous in-memory retry policy only after the whole prompt settles. Separate length/compaction recovery remains native.
+
 The fork owner authorized this implementation directly in the task conversation. This fork-specific authorization does not claim upstream Spec approval. The initial baseline was `61120d19e1af69c9bd9c93b5620143b448a1df0a`; the fork and implementation were subsequently synchronized with upstream `4d1af48cdb68039c67bec71a05c0ce3190b1ebde`. Node `24.18.1`, pnpm `12.6.0`, Electron `44.9.3` and Claude Agent SDK `0.3.284` are pinned by the repository.
 
 ## Alternatives considered
@@ -41,6 +43,8 @@ Keeping remote renderers behind silent fallbacks preserves the data leak. A list
 - AC7 — Usage displays authentic supported provider quotas with resets and scope, separately from tokens and paid extra usage; unknown or mismatched accounts never receive invented values. (verification: unit | renderer)
 - AC8 — Projects reuse existing agents, group sessions and share project instructions, workspace files and explicitly selected knowledge without exposing another project's context. (verification: unit | renderer | Electron)
 - AC9 — Existing sessions, data and backup restoration survive appended database migrations and the new optional project association. (verification: unit)
+- AC10 — Valid provider model limits survive listing and persistence without overwriting explicit settings or inventing a combined context window. (verification: unit | renderer)
+- AC11 — Pi retries eligible pre-output failures but preserves visible partial responses without automatic replay; future explicit turns and existing retry settings remain usable. (verification: unit | native SDK)
 
 ## Risks
 

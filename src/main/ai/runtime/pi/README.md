@@ -20,7 +20,12 @@ headers associate provider calls with the active Agent input. The internal liste
 of the externally exposed gateway setting.
 
 Pi's session retry policy owns retry decisions. The native HTTP client and gateway do not add
-retries. Native usage is for context and display; it must not create another billing record.
+retries. Cherry keeps native retries before output, then temporarily disables automatic replay
+after the first nonempty text/reasoning chunk or started tool. A subsequent transport failure
+terminates the turn while retaining visible output. The in-memory retry setting is restored
+only after `prompt()` settles, not on the earlier `agent_end` event. An explicit next user turn
+can continue normally. This does not disable Pi's separate length/compaction continuation.
+Native usage is for context and display; it must not create another billing record.
 Model metadata, native errors and tool validation follow Pi's provider implementation. There is no
 `ModelCallPort`, custom AI SDK stream protocol, metadata codec or implicit session requirement.
 

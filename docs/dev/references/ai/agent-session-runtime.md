@@ -55,6 +55,10 @@ driver internals behind the same host contract.
 | Usage capture | Each driver exposes provider-invocation capture according to its transport; gateway-backed calls use AiService middleware rather than a runtime aggregate. |
 | Runtime timing | `AiStreamManager` owns the message clock. Drivers contribute provider/tool timing when their SDK exposes it; approval waits are captured independently from approval request to decision/abort. |
 
+## Partial responses and transport retries
+
+Pi retains its native automatic retry policy until it emits nonempty text/reasoning or starts a tool. Cherry then disables automatic replay for the remainder of the prompt. A retryable transport error, including the SDK's HTTP/2 errors, finishes as an error with the existing output preserved; it does not append a regenerated answer to the same message. The previous in-memory retry setting returns after the prompt promise settles, preserving an already-disabled policy. Intermediate `agent_end` events must not restore it because Pi decides retries afterwards. Length/compaction recovery remains owned by Pi, and explicit user continuation remains available. This policy does not change the normal Chat Chromium transport or claim to repair an upstream HTTP/2 connection.
+
 ## Project conversations
 
 `AgentProjectService` owns SQLite project definitions, reusable Agent memberships and selected knowledge bases. A conversation may carry an immutable optional `projectId`; creating one requires a current member and the project's registered user workspace. Ordinary empty-session reuse excludes project sessions. The Projects display mode groups conversations and opens the project editor, where a user chooses an existing member to start a chat. Adding members does not launch an autonomous workflow.

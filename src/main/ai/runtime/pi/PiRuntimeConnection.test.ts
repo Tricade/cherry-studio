@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
+import type { AssistantMessage } from '@earendil-works/pi-ai'
 import type { AgentSessionEvent } from '@earendil-works/pi-coding-agent'
 import { SpanStatusCode, trace } from '@opentelemetry/api'
 import { setupTestDatabase } from '@test-helpers/db'
@@ -111,6 +112,7 @@ const mocks = vi.hoisted(() => ({
   setShellCommandPrefix: vi.fn(),
   getShellEnv: vi.fn(),
   isStreaming: false,
+  retryEnabled: true,
   steeringMode: 'one-at-a-time' as 'all' | 'one-at-a-time',
   sessionId: 'sess-1' as string | undefined,
   sessionFile: '/cherry/agents/pi/sessions/2026-07-06T00-00-00-000Z_sess-1.jsonl' as string | undefined
@@ -241,6 +243,12 @@ const fakeSession = {
     return mocks.steeringMode
   },
   prompt: mocks.prompt,
+  get autoRetryEnabled() {
+    return mocks.retryEnabled
+  },
+  setAutoRetryEnabled(enabled: boolean) {
+    mocks.retryEnabled = enabled
+  },
   compact: mocks.compact,
   steer: mocks.steer,
   clearQueue: mocks.clearQueue,
@@ -340,6 +348,109 @@ async function nextEventWithin(events: AsyncIterable<AgentRuntimeEvent>): Promis
   ])
 }
 
+async function nativeRetryFixture(
+  responses: Array<{ text?: string; thinking?: string; error?: string }>,
+  retry = true
+) {
+  const pi = await import('@earendil-works/pi-coding-agent')
+  const ai = await import('@earendil-works/pi-ai')
+  const cwd = await mkdtemp(path.join(tmpdir(), 'cherry-pi-retry-'))
+  const settingsManager = pi.SettingsManager.inMemory({
+    compaction: { enabled: false },
+    retry: { enabled: retry, maxRetries: 2, baseDelayMs: 1, maxAgentDelayMs: 10 }
+  })
+  const resourceLoader = new pi.DefaultResourceLoader({
+    cwd,
+    agentDir: cwd,
+    settingsManager,
+    noExtensions: true,
+    noSkills: true,
+    noPromptTemplates: true,
+    noThemes: true,
+    noContextFiles: true
+  })
+  await resourceLoader.reload()
+  const modelRuntime = await pi.ModelRuntime.create({
+    credentials: new ai.InMemoryCredentialStore(),
+    modelsPath: null,
+    refreshOnCreate: false
+  })
+  let attempts = 0
+  modelRuntime.registerProvider('retry-fixture', {
+    api: 'openai-completions',
+    baseUrl: 'https://retry.invalid/v1',
+    apiKey: 'fixture-only',
+    models: [
+      {
+        id: 'retry-model',
+        name: 'Retry fixture',
+        reasoning: true,
+        input: ['text'],
+        contextWindow: 32000,
+        maxTokens: 1000,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
+      }
+    ],
+    streamSimple: () => {
+      const plan = responses[attempts++]
+      if (!plan) throw new Error('Unexpected provider replay')
+      const message: AssistantMessage = {
+        role: 'assistant',
+        api: 'openai-completions',
+        provider: 'retry-fixture',
+        model: 'retry-model',
+        content: [],
+        stopReason: plan.error ? 'error' : 'stop',
+        errorMessage: plan.error,
+        timestamp: Date.now(),
+        usage: {
+          input: 1,
+          output: 1,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 2,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }
+        }
+      }
+      const stream = ai.createAssistantMessageEventStream()
+      stream.push({ type: 'start', partial: message })
+      if (plan.text !== undefined) {
+        message.content.push({ type: 'text', text: plan.text })
+        stream.push({ type: 'text_start', contentIndex: 0, partial: message })
+        stream.push({ type: 'text_delta', contentIndex: 0, delta: plan.text, partial: message })
+      }
+      if (plan.thinking !== undefined) {
+        message.content.push({ type: 'thinking', thinking: plan.thinking })
+        stream.push({ type: 'thinking_start', contentIndex: 0, partial: message })
+        stream.push({ type: 'thinking_delta', contentIndex: 0, delta: plan.thinking, partial: message })
+      }
+      if (plan.error) stream.push({ type: 'error', reason: 'error', error: message })
+      else stream.push({ type: 'done', reason: 'stop', message })
+      stream.end()
+      return stream
+    }
+  })
+  const { session } = await pi.createAgentSession({
+    cwd,
+    agentDir: cwd,
+    modelRuntime,
+    settingsManager,
+    resourceLoader,
+    sessionManager: pi.SessionManager.inMemory(cwd),
+    model: modelRuntime.getModel('retry-fixture', 'retry-model'),
+    tools: []
+  })
+  mocks.createAgentSession.mockResolvedValueOnce({ session })
+  return {
+    session,
+    attempts: () => attempts,
+    dispose: async () => {
+      session.dispose()
+      await rm(cwd, { recursive: true, force: true })
+    }
+  }
+}
+
 beforeAll(async () => {
   actualReadFileSync = (await vi.importActual<typeof NodeFs>('node:fs')).readFileSync
   await rm(MISSING_PI_AGENT_DIR, { recursive: true, force: true })
@@ -362,6 +473,7 @@ beforeEach(() => {
   mocks.validateGitBashPath.mockImplementation((shellPath?: string | null) => shellPath ?? null)
   mocks.getShellEnv.mockResolvedValue({ PATH: '/opt/homebrew/bin:/usr/bin' })
   mocks.isStreaming = false
+  mocks.retryEnabled = true
   mocks.steeringMode = 'one-at-a-time'
   mocks.sessionId = SESSION_ID
   mocks.sessionFile = SESSION_FILE
@@ -1609,6 +1721,95 @@ describe('PiRuntimeConnection', () => {
     const err = events.find((e) => e.type === 'compaction-error')
     expect(err).toMatchObject({ error: 'context too large' })
     expect(events.some((e) => e.type === 'compaction-complete')).toBe(false)
+  })
+
+  it.each(['text', 'thinking'] as const)(
+    'preserves partial %s on a retryable HTTP/2 failure without replaying it',
+    async (kind) => {
+      const fixture = await nativeRetryFixture([
+        { [kind]: 'Already visible', error: 'Upstream HTTP/2 stream failed' },
+        { text: 'Next user turn' }
+      ])
+      const conn = await new PiRuntimeConnection(input).start()
+      try {
+        conn.send(userInput('first'))
+        const events = await collectUntilTerminal(conn.events)
+        expect(fixture.attempts()).toBe(1)
+        expect(events.filter((event) => event.type === 'error')).toHaveLength(1)
+        expect(
+          events
+            .filter(
+              (event) =>
+                event.type === 'chunk' && (event.chunk.type === 'text-delta' || event.chunk.type === 'reasoning-delta')
+            )
+            .map((event) => (event.type === 'chunk' && 'delta' in event.chunk ? event.chunk.delta : ''))
+        ).toEqual(['Already visible'])
+        expect(fixture.session.autoRetryEnabled).toBe(true)
+        conn.send(userInput('continue explicitly'))
+        const next = await collectUntilTerminal(conn.events)
+        expect(fixture.attempts()).toBe(2)
+        expect(next.at(-1)?.type).toBe('turn-complete')
+      } finally {
+        await conn.close()
+        await fixture.dispose()
+      }
+    }
+  )
+
+  it.each([undefined, ''])('retains native automatic retry before any visible content (%j)', async (text) => {
+    const fixture = await nativeRetryFixture([{ text, error: 'Upstream HTTP/2 stream failed' }, { text: 'Recovered' }])
+    const conn = await new PiRuntimeConnection(input).start()
+    try {
+      conn.send(userInput('retry before output'))
+      const events = await collectUntilTerminal(conn.events)
+      expect(fixture.attempts()).toBe(2)
+      expect(events.at(-1)?.type).toBe('turn-complete')
+      expect(events.some((event) => event.type === 'error')).toBe(false)
+    } finally {
+      await conn.close()
+      await fixture.dispose()
+    }
+  })
+
+  it('preserves a previously disabled retry policy after partial output', async () => {
+    const fixture = await nativeRetryFixture(
+      [{ text: 'Partial', error: 'http2 request did not get a response' }],
+      false
+    )
+    const conn = await new PiRuntimeConnection(input).start()
+    try {
+      conn.send(userInput('keep disabled'))
+      expect((await collectUntilTerminal(conn.events)).at(-1)?.type).toBe('error')
+      expect(fixture.session.autoRetryEnabled).toBe(false)
+      expect(fixture.attempts()).toBe(1)
+    } finally {
+      await conn.close()
+      await fixture.dispose()
+    }
+  })
+
+  it('keeps retry disabled after a tool starts until the whole prompt has settled', async () => {
+    const pending = createDeferred<void>()
+    mocks.prompt.mockReturnValueOnce(pending.promise)
+    const conn = await new PiRuntimeConnection(input).start()
+    conn.send(userInput('perform one action'))
+    mocks.subscribeCb!({
+      type: 'tool_execution_start',
+      toolName: 'write',
+      toolCallId: 'once',
+      args: {}
+    })
+    expect(mocks.retryEnabled).toBe(false)
+    mocks.subscribeCb!({ type: 'agent_end', messages: [], willRetry: false })
+    expect(mocks.retryEnabled).toBe(false)
+    pending.reject(new Error('http2 request did not get a response'))
+    const events = await collectUntilTerminal(conn.events)
+    expect(
+      events.filter((event) => event.type === 'chunk' && event.chunk.type === 'tool-input-available')
+    ).toHaveLength(1)
+    expect(events.at(-1)?.type).toBe('error')
+    expect(mocks.retryEnabled).toBe(true)
+    await conn.close()
   })
 
   it('holds the turn open while an auto-retry is pending', async () => {

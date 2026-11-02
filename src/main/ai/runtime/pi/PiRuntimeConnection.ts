@@ -158,7 +158,17 @@ export class PiRuntimeConnection implements AgentRuntimeConnection {
   private readonly providerSpans = new Set<Span>()
   private readonly toolSpans = new Map<string, Span>()
   private readonly adapter = new PiStreamAdapter(
-    { enqueue: (chunk) => this.eventQueue.push({ type: 'chunk', chunk }) },
+    {
+      enqueue: (chunk) => {
+        if (
+          ((chunk.type === 'text-delta' || chunk.type === 'reasoning-delta') && chunk.delta.length > 0) ||
+          chunk.type === 'tool-input-start'
+        ) {
+          this.preventVisibleOutputReplay()
+        }
+        this.eventQueue.push({ type: 'chunk', chunk })
+      }
+    },
     (name) => this.resolveMcpToolMetadata(name)
   )
   private mcpServerSnapshots: PiConnectionSnapshot['mcpServerSnapshots'] = new Map()
@@ -181,6 +191,7 @@ export class PiRuntimeConnection implements AgentRuntimeConnection {
   private traceContext?: AgentRuntimeTraceContext
   private _usageCapture?: AgentSessionUsageCapture
   private promptRunActive = false
+  private retryEnabledBeforeOutput?: boolean
   /** Manual compact is a Cherry user turn, but pi only emits compaction events for `compact()` —
    *  no `agent_end`. This flag lets that path close exactly one host turn without making auto-compacts terminal. */
   private manualCompactInFlight = false
@@ -499,6 +510,7 @@ export class PiRuntimeConnection implements AgentRuntimeConnection {
       this.eventQueue.push({ type: 'error', error: new Error('pi session is not started') })
       return
     }
+    if (!this.promptRunActive && !session.isStreaming) this.restoreRetryPolicy()
     const rawContent = buildAgentUserContent(input.message)
 
     // A `systemReminder` message is a steer the host re-queued as its own turn (an undelivered steer
@@ -716,8 +728,22 @@ export class PiRuntimeConnection implements AgentRuntimeConnection {
     }
   }
 
+  private preventVisibleOutputReplay(): void {
+    if (!this.session || this.retryEnabledBeforeOutput !== undefined) return
+    this.retryEnabledBeforeOutput = this.session.autoRetryEnabled
+    this.session.setAutoRetryEnabled(false)
+  }
+
+  private restoreRetryPolicy(): void {
+    if (this.retryEnabledBeforeOutput === undefined) return
+    this.session?.setAutoRetryEnabled(this.retryEnabledBeforeOutput)
+    this.retryEnabledBeforeOutput = undefined
+  }
+
   private finishPromptRun(error?: unknown): void {
     if (this.closed) return
+    // agent_end precedes Pi's retry decision; only a settled prompt permits restoring it.
+    if (this.promptRunActive) this.restoreRetryPolicy()
     this.promptRunActive = false
     this.awaitingPromptStart = false
     this.maybeEmitResumeToken()
