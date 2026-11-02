@@ -16,6 +16,8 @@ Use the MIT `@plantuml/core` npm engine pinned to `1.2026.9` with bundled themes
 
 Prepare diagnostics locally from explicitly selected categories, show the exact prepared archive contents and destination, and require confirmation before uploading that same archive. Make scheduled update checks switchable with an accurate disclosure of request metadata and region lookup. Explain automatic downloads and downloads triggered by manual checks; portable builds retain the release-note privacy disclosure. Show backup contents, credentials, destination, archive protection and remote transmission alongside manual and scheduled controls.
 
+Omit DataApi request parameters and bodies from request logs at every log level, including diagnostics mode. Keep method, path, request ID and status for correlation, and pass the original input unchanged to its consumer. Field-name redaction cannot protect arbitrary prompts or opaque values, so omit the payload at its source. Historical logs are not rewritten or automatically sanitized: selected logs remain visible as their actual prepared archive contents before confirmation.
+
 Add read-only provider quota reports to Usage, keeping token analytics separate. Show provider-reported used percentages, windows, resets, model or shared-bucket scope, and available credit or voucher information. Included subscription consumption has zero additional usage cost; paid extra usage remains separate. Missing data is unavailable, never estimated from tokens. Read only the selected account or verified matching account; never redeem credits or expand login permissions.
 
 Quota refresh is manual and transient. Codex uses an installed CLI's `account/rateLimits/read` with strict Cherry account matching, checked against the official `rust-v0.166.0-alpha.5.1` protocol. Claude uses the pinned `0.3.284` SDK's experimental usage control with `skipBehaviors: true`, no input prompt, and the existing CLI login profile. CherryIN returns raw balance units without a profile request and rejects a changed credential. Other sign-ins report unsupported. Unknown currency scales remain raw provider units; existing token price estimates remain API-equivalent analytics rather than subscription invoices. Managed Claude policy hooks remain subject to the SDK's policy precedence.
@@ -47,6 +49,7 @@ Keeping remote renderers behind silent fallbacks preserves the data leak. A list
 - AC9 — Existing sessions, data and backup restoration survive appended database migrations and the new optional project association. (verification: unit)
 - AC10 — Valid provider model limits survive listing and persistence without overwriting explicit settings or inventing a combined context window. (verification: unit | renderer)
 - AC11 — Pi retries eligible pre-output failures but preserves visible partial responses without automatic replay; future explicit turns and existing retry settings remain usable. (verification: unit | native SDK)
+- AC12 — DataApi request logging excludes parameters and bodies, including opaque nested values and free text, while preserving downstream input and correlated request metadata. (verification: unit)
 
 ## Risks
 
