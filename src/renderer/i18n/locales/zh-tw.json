@@ -4693,7 +4693,7 @@
   "settings.fetch.allow_private_network": "允許存取本機網路位址",
   "settings.fetch.allow_private_network_tip": "允許網頁擷取工具存取 localhost 與內網位址。若不希望模型讀取本機或區域網路上的服務，請關閉。",
   "settings.font_size.title": "訊息字型大小",
-  "settings.general.auto_check_update.control": "此開關控制自動檢查。手動檢查和開啟發行說明仍會送出這些要求。手動檢查也可能下載可用的更新。",
+  "settings.general.auto_check_update.control": "此開關控制自動檢查和自動下載。手動檢查和開啟發行說明仍會送出這些要求。即使關閉自動檢查，手動檢查時仍可能下載可用的更新。",
   "settings.general.auto_check_update.privacy": "檢查更新和開啟發行說明時會連線至 releases.cherry-ai.com。要求會揭露你的 IP 位址，並傳送持續使用的安裝 ID、應用程式版本、OS 版本與架構、版本類型及地區。偵測地區時也會連線至 api.ipinfo.io。",
   "settings.general.auto_check_update.title": "自動更新",
   "settings.general.avatar.builtin": "內建頭像",

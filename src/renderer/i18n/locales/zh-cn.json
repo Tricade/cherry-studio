@@ -4693,7 +4693,7 @@
   "settings.fetch.allow_private_network": "允许访问本地网络地址",
   "settings.fetch.allow_private_network_tip": "允许网页抓取工具访问 localhost 和内网地址。如果不希望模型读取本机或局域网上的服务，请关闭。",
   "settings.font_size.title": "消息字体大小",
-  "settings.general.auto_check_update.control": "此开关控制自动检查。手动检查和打开发行说明仍会发送这些请求。手动检查还可能下载可用更新。",
+  "settings.general.auto_check_update.control": "此开关控制自动检查和自动下载。手动检查和打开发行说明仍会发送这些请求。即使关闭了自动检查，手动检查时仍可能下载可用更新。",
   "settings.general.auto_check_update.privacy": "检查更新和打开发行说明时会连接 releases.cherry-ai.com。请求会暴露你的 IP 地址，并发送持久的安装 ID、应用版本、OS 版本和架构、版本类型及地区。检测地区时还会连接 api.ipinfo.io。",
   "settings.general.auto_check_update.title": "自动更新",
   "settings.general.avatar.builtin": "内置头像",

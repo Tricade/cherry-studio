@@ -4693,7 +4693,7 @@
   "settings.fetch.allow_private_network": "Yerel ağ adreslerinden veri alınmasına izin ver",
   "settings.fetch.allow_private_network_tip": "Web'den veri alma araçlarının localhost ve özel ağ adreslerine erişmesini sağlar. Modellerin bu makinedeki veya LAN'daki hizmetleri okuması istenmiyorsa bunu kapatın.",
   "settings.font_size.title": "İleti yazı tipi boyutu",
-  "settings.general.auto_check_update.control": "Bu anahtar otomatik denetimleri yönetir. Elle denetim yapmak ve sürüm notlarını açmak yine bu istekleri gönderir. Elle denetim, mevcut bir güncellemeyi de indirebilir.",
+  "settings.general.auto_check_update.control": "Bu anahtar otomatik denetimleri ve indirmeleri yönetir. Elle denetim yapmak ve sürüm notlarını açmak yine bu istekleri gönderir. Otomatik denetimler kapalı olsa bile elle denetim sırasında mevcut bir güncelleme indirilebilir.",
   "settings.general.auto_check_update.privacy": "Güncelleme denetimleri ve sürüm notları releases.cherry-ai.com ile iletişim kurar. İstekler IP adresinizi açığa çıkarır ve kalıcı bir kurulum kimliği, uygulama sürümü, işletim sistemi sürümü ve mimarisi, sürüm çeşidi ile bölge bilgisini gönderir. Bölge tespiti ayrıca api.ipinfo.io ile iletişim kurar.",
   "settings.general.auto_check_update.title": "Otomatik Güncelleme",
   "settings.general.avatar.builtin": "Yerleşik avatar",

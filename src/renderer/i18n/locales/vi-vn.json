@@ -4693,7 +4693,7 @@
   "settings.fetch.allow_private_network": "Cho phép truy cập địa chỉ mạng nội bộ",
   "settings.fetch.allow_private_network_tip": "Cho phép các công cụ tải nội dung web truy cập localhost và địa chỉ mạng riêng. Hãy tắt nếu bạn không muốn mô hình đọc các dịch vụ trên máy của bạn hoặc trong mạng LAN.",
   "settings.font_size.title": "Kích thước phông chữ tin nhắn",
-  "settings.general.auto_check_update.control": "Nút bật/tắt này kiểm soát việc kiểm tra tự động. Kiểm tra thủ công và mở ghi chú phát hành vẫn gửi các yêu cầu này. Kiểm tra thủ công cũng có thể tải xuống bản cập nhật hiện có.",
+  "settings.general.auto_check_update.control": "Nút bật/tắt này kiểm soát việc kiểm tra và tải xuống tự động. Kiểm tra thủ công và mở ghi chú phát hành vẫn gửi các yêu cầu này. Khi kiểm tra thủ công, ứng dụng vẫn có thể tải xuống bản cập nhật hiện có ngay cả khi đã tắt kiểm tra tự động.",
   "settings.general.auto_check_update.privacy": "Việc kiểm tra bản cập nhật và mở ghi chú phát hành sẽ kết nối với releases.cherry-ai.com. Các yêu cầu tiết lộ địa chỉ IP và gửi ID cài đặt lâu dài, phiên bản ứng dụng, phiên bản và kiến trúc OS, phiên bản sản phẩm và khu vực. Việc xác định khu vực cũng kết nối với api.ipinfo.io.",
   "settings.general.auto_check_update.title": "Tự động cập nhật",
   "settings.general.avatar.builtin": "Hình đại diện tích hợp sẵn",
