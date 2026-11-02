@@ -15,6 +15,8 @@ import path from 'path'
  *   --type=models     generate model icons, avatars, barrels, and loaders
  */
 import { transform } from '@svgr/core'
+import { format } from 'prettier'
+import { optimize } from 'svgo'
 
 import { generateMeta } from './codegen'
 import { detectHasBackground } from './icons-generate-avatars'
@@ -215,61 +217,47 @@ function scopeStaticSvgReferences(jsCode: string, componentName: string): string
 /**
  * Run SVGR transform on SVG content, return TSX code.
  */
-async function svgrTransform(svgCode: string, componentName: string): Promise<string> {
-  const processedSvg = ensureViewBox(svgCode)
-
-  let jsCode = await transform(
-    processedSvg,
-    {
-      plugins: ['@svgr/plugin-svgo', '@svgr/plugin-jsx', '@svgr/plugin-prettier'],
-      icon: true,
-      typescript: true,
-      prettier: true,
-      prettierConfig: {
-        singleQuote: true,
-        semi: false,
-        printWidth: 120,
-        tabWidth: 2,
-        useTabs: false,
-        endOfLine: 'lf',
-        bracketSameLine: false,
-        bracketSpacing: true
-      },
-      jsxRuntime: 'automatic',
-      svgoConfig: {
-        plugins: [
-          {
-            name: 'removeForeignObject',
-            fn: () => ({
-              element: {
-                enter: (node: any, parentNode: any) => {
-                  if (node.name === 'foreignObject') {
-                    parentNode.children = parentNode.children.filter((c: any) => c !== node)
-                  }
-                }
+export async function svgrTransform(svgCode: string, componentName: string): Promise<string> {
+  const optimized = optimize(ensureViewBox(svgCode), {
+    plugins: [
+      {
+        name: 'removeForeignObject',
+        fn: () => ({
+          element: {
+            enter: (node, parentNode) => {
+              if (node.name === 'foreignObject') {
+                parentNode.children = parentNode.children.filter((child) => child !== node)
               }
-            })
-          },
-          {
-            name: 'preset-default',
-            params: {
-              overrides: {
-                removeViewBox: false,
-                convertPathData: false
-              }
-            }
-          },
-          {
-            name: 'prefixIds',
-            params: {
-              prefix: componentName.toLowerCase()
             }
           }
-        ]
+        })
+      },
+      {
+        name: 'preset-default',
+        params: { overrides: { removeViewBox: false, convertPathData: false } }
+      },
+      {
+        name: 'prefixIds',
+        params: { prefix: componentName.toLowerCase() }
       }
-    },
+    ]
+  })
+  const transformed = await transform(
+    optimized.data,
+    { plugins: ['@svgr/plugin-jsx'], icon: true, typescript: true, jsxRuntime: 'automatic' },
     { componentName }
   )
+  let jsCode = await format(transformed, {
+    parser: 'typescript',
+    singleQuote: true,
+    semi: false,
+    printWidth: 120,
+    tabWidth: 2,
+    useTabs: false,
+    endOfLine: 'lf',
+    bracketSameLine: false,
+    bracketSpacing: true
+  })
 
   // Add named export
   jsCode = jsCode.replace(

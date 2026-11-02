@@ -17,8 +17,8 @@ describe('backported dependency security fixes', () => {
     expect(result.error.issues[0].code).toBe('too_big')
   })
 
-  it('deepmerge keeps copied prototype keys as inert own data properties', () => {
-    const merge = requireFrom('html-to-text')('deepmerge') as (
+  it('HTML conversion dependency keeps copied prototype keys inert', () => {
+    const merge = requireFrom('html-to-text')('deepmerge-ts').deepmerge as (
       target: Record<string, unknown>,
       source: Record<string, unknown>
     ) => Record<string, unknown>

@@ -41,7 +41,7 @@ Dependabot 可能需要人工协助调整版本专属补丁。CI 任务更名后
 ## 验证
 
 - Regression — GitHub REST API 2026-03-10 回读确认了拉取请求要求、管理员约束、提交签名、讨论解决、禁止强制推送和删除、漏洞警报（HTTP 204）及已启用的安全更新。不要求其他人批准。
-- Regression — 配置检查确认全部 43 个带补丁的包名及 Electron 均排除在普通次版本和补丁更新组之外，而非被忽略。安全修复新增 `@mistralai/mistralai`、`deepmerge`、`glob`、`minimatch` 和 `zod`；minimatch 和 Zod 各有两个版本，使 43 个包名对应 45 个补丁版本键。每周计划将 npm 版本更新拉取请求限制为五个，GitHub Actions 限制为三个。
+- Regression — 配置检查确认全部 42 个带补丁的包名及 Electron 均排除在普通次版本和补丁更新组之外，而非被忽略。移除独立 Zod 3 与 deepmerge 后，两个 minimatch 版本使 42 个包名对应 43 个补丁版本键。在移除 deepmerge 最后一个依赖路径时，一并移除其已过时的分组排除项。每周计划将 npm 版本更新拉取请求限制为五个，GitHub Actions 限制为三个。
 - Regression — 固定版本 pnpm 12.6.0 的冻结锁文件安装、YAML 解析、限定文件格式检查、文档检查和差异空白检查均通过。已检查受影响验证计划；未针对本配置变更在本地执行其全套测试回退。
 - Regression — 未修改的 CI 任务已在提交 `a5c20d34f2234e9989311ceb62b9d98dc46ac6ef` 的手动基线运行 [41439838545](https://github.com/Tricade/cherry-studio/actions/runs/41439838545) 中成功完成。这证明了基线的实际执行，但不属于合格的 PR 检查。最终仍需在发布的提交上验证推送事件执行和合并资格。
 - Regression — 提交适配器的十三个针对性用例保留传递依赖版本、可选平台包、直接依赖关系、不受文档顺序影响的工作区根节点依赖边，以及 peer 上下文依赖边的并集；不完整清单会失败。15 份原生 split 导出与锁文件的全部 importer 及其直接依赖数量一致，包括 ai-core 的 19 条和 system-speech 的五条。合并后得到 2,920 个依赖节点和 6,355 条包间依赖边，包括 Electron、旧版 Zod、deepmerge、glob 和 minimatch。工作流语法通过 actionlint 1.7.12。仅本地生成不能证明 GitHub 已接受快照或建立索引。

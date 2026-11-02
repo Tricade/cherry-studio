@@ -29,17 +29,20 @@ Vitest 5.0.5 要求同一执行组中的项目使用相同的 `maxWorkers`。`ai
 
 Markdown 源码行定位测试使用多行段落填充，使序列化测试不启动无人管理的异步高亮 worker。Vitest 的 worker 模拟可能在 JSDOM 环境销毁后才投递响应。专门的高亮测试套件保留真实 worker 覆盖，并最多等待十秒获取初始语法输出，与其已有冷启动用例一致；重新安装依赖后，一秒默认等待曾超时。
 
-三个剩余发现继续使用本地补丁，等待其使用方迁移。Zod 捆绑的兼容 API 与 Mistral OCR 操作也保留针对性保护：
+两个剩余发现继续使用本地补丁，等待其使用方迁移。Zod 捆绑的兼容 API 与 Mistral OCR 操作也保留针对性保护：
 
 | 包 | 回移修复与运行时入口 |
 | --- | --- |
-| deepmerge 4.3.1 | 将复制键定义为自身数据属性，防止 `__proto__` 调用目标对象的原型 setter；覆盖源码、CJS 和 UMD 构建 |
 | glob 13.0.6 | 在 CJS 和 ESM 中应用上游四处 `return cb()` 中止修复；包根入口指向现有非捆绑入口，因为默认压缩捆绑文件内含旧 walker |
 | minimatch 9.0.7 与 10.2.6 | 回移上游的优化器展开上限及二次复杂度去重截止条件；保留两种模块格式和使用方现有主版本 |
 | Zod 4.6.6 的 v3 兼容 API | 在访问元素前拒绝超过大小上限的数组/集合；覆盖源码、CJS 和 ESM，并保留已有大小诊断 |
 | Mistral SDK 2.7.0 OCR | 将独立 Zod 3 依赖迁移到 Zod 4.6.6；先以公开的提前中止 API 验证 HTTP 200/422 响应体，再正常解析有效输出；畸形输出仅产生一条诊断 |
 
 Minimatch 3/5 没有公告所述优化级别 2 预处理路径，但纯版本公告范围仍列出它们。Minimatch 9 保留原有公共类型；回移补丁不声明新的花括号展开 API。
+
+移除 deepmerge 4.3.1 的所有依赖路径，而非继续保留其回移补丁。[html-to-text 10.0.1](https://github.com/html-to-text/node-html-to-text/blob/1c39d9885075836a7e45d0236c7a5541dede8e52/packages/html-to-text/CHANGELOG.md) 使用 deepmerge-ts 8（解析为 8.0.2），并支持仓库的 Node 运行时。保留现有语音选择器和格式化函数。SVG 生成器直接调用现有 SVGO 3.3.5 优化器及 SVGR 8.1.0 JSX 插件，再调用 [Prettier 3.8.1 的异步格式化 API](https://github.com/prettier/prettier/blob/3.8.1/website/versioned_docs/version-stable/api.md)，替换两个仍依赖 deepmerge 的包装插件。保留显式优化/格式化选项、嵌入 HTML 移除、viewBox/路径数据及每个实例独立的 React ID。移除不再使用的 deepmerge 补丁和 Dependabot 分组排除项。
+
+UI 包已有的独立类型检查在基线生成器下也因 Markdown CSS 导入而失败。其根命令解析到 TypeScript 7.0.2，该版本[默认检查副作用导入](https://github.com/microsoft/TypeScript/blob/v7.0.2/src/compiler/commandLineParser.ts)。在 UI 包现有 `src/types` 目录声明 CSS 资源导入，不关闭检查或更换编译器。这只是类型声明，不是 CSS 加载器或运行时修改。
 
 ## 考虑过的替代方案
 
@@ -50,7 +53,7 @@ Minimatch 3/5 没有公告所述优化级别 2 预处理路径，但纯版本公
 
 ## 影响
 
-Mistral 迁移后，纯版本审计以退出码 1 报告三条记录：两条 glob/minimatch 中危和一条 deepmerge 低危。解析后的锁文件中已无独立 Zod 3.25.76 包。剩余漏洞机制已有本地保护及测试，上游版本号保持不变。没有屏蔽任何公告，也不将审计报告为通过。
+Mistral 和 deepmerge 迁移后，纯版本审计以退出码 1 报告两条 glob/minimatch 中危记录。解析后的锁文件中已无独立 Zod 3.25.76、deepmerge 4.3.1 及其两个 SVGR 包装插件。剩余漏洞机制已有本地保护及测试，上游版本号保持不变。没有屏蔽任何公告，也不将审计报告为通过。
 
 **移除 Zod 3 依赖，保留捆绑兼容解析器保护：** [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5) 报告的 Mistral 1.11.0 → Zod 3.25.76 路径已替换为 Mistral 2.7.0 → Zod 4.6.6。在原回移修复前，含 10,000 个无效元素的受约束数组在 Zod 3.25.76 和 Zod 4.6.6 的 `/v3` 路径上均产生 10,001 条错误，而已修复的 Zod 4 根入口仅产生一条。[官方修复](https://github.com/colinhacks/zod/commit/a0ebf970f2d752e5f58527cd2942ff48be4f46bd) 只修改 v4，[v3 后续问题](https://github.com/colinhacks/zod/issues/6653) 未提供已发布的修复版 v3。剩余兼容解析器保留已验证的提前拒绝机制，移除已不再使用的独立包补丁。
 
@@ -67,6 +70,7 @@ Cherry 的图像/文档处理器调用配置端点的 `ocr.process`。恶意或�
 ## 验证
 
 - Regression — `pnpm test:scripts scripts/__tests__/dependencySecurity.test.ts scripts/__tests__/dependencyCompatibility.test.ts`：Zod 错误数量有界、原型键保持惰性、glob 优化有界、中止后停止目录 I/O、CSV/ANSI 输出、原生 tar 提取及真实回环 HTTP 响应。
+- Compatibility — `packages/ui/scripts/__tests__/icons-generate.test.ts`、`src/renderer/services/voice/__tests__/readableText.test.ts` 和 `scripts/__tests__/dependencySecurity.test.ts`：移除 deepmerge 后，39 项用例全部通过。两个新增生成器用例在旧流水线下也通过；它们编译并渲染实际生成的组件，保留几何形状、可缩放尺寸和每个实例独立的渐变/裁剪/href 引用，同时移除嵌入 HTML。现有语音测试保留私密内容过滤、文本顺序、有意义的图像描述及分块限制。新的合并依赖使原型键保持惰性。添加 CSS 声明后，UI 和渲染器类型检查通过；基线 CSS 错误单独记录。
 - Regression — `pnpm test:scripts scripts/__tests__/mistralOcrValidation.test.ts`：十项用例覆盖畸形页面、嵌套图像和 HTTP 422 的提前停止、诊断上限、256 个有效页面、结构化 API 错误、无关操作的有效 union 响应，以及真实 SDK 的上传/签名 URL/删除传输，包括端点、认证和取消信号传播。移植保护前，SDK 2.7.0 访问全部 2,000 个无效元素，当时六项用例中四项失败；补丁后十项全部通过。
 - Regression — `scripts/__tests__/legacyZodCollectionBounds.test.ts`：保留的 24 项用例覆盖 Zod 4 捆绑 v3 解析器的 CJS/ESM 入口、同步/异步数组与集合上限、超限输入不执行元素操作、转换、下限、union 后续有效分支以及嵌套/重叠诊断。仅移除针对已删除独立 Zod 3 包的测试。
 - Compatibility — 现有 Mistral 工具/文档处理器测试的九项用例以及 `pnpm typecheck:node` 均通过。单独的 CommonJS 测试在 Electron 44.9.3 的 Node 24.22.0 运行时加载 ESM SDK，并转换有效的合成 OCR 响应；这不等于完整应用或安装器测试。SDK 遥测保持未配置状态；其可选 exporter peer 要求 0.220.x，而应用提供 0.200.x，因此显式开启这一未使用的 SDK 遥测路径不在本次验证范围内。

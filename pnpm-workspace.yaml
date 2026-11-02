@@ -137,7 +137,6 @@ overrides:
 
 patchedDependencies:
   # Preserve installed APIs while backporting the upstream traversal/optimization fixes.
-  "deepmerge@4.3.1": patches/deepmerge@4.3.1.patch
   "glob@13.0.6": patches/glob@13.0.6.patch
   "minimatch@9.0.7": patches/minimatch@9.0.7.patch
   "minimatch@10.2.6": patches/minimatch@10.2.6.patch
