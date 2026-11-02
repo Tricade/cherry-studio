@@ -39,6 +39,7 @@ export interface CherryDiagnosticUploadInput {
   expectedFileSha256?: string
   fileName: string
   filePath: AbsoluteFilePath
+  fileBytes?: Buffer
 }
 
 function rejected(reason: CherryDiagnosticUploadFailureReason, fileSha256?: string): CherryDiagnosticUploadResult {
@@ -197,6 +198,17 @@ export class CherryDiagnosticUploadClient {
   async upload(input: CherryDiagnosticUploadInput): Promise<CherryDiagnosticUploadResult> {
     if (!isZipPath(input.fileName)) return rejected('invalid_archive')
 
+    if (input.fileBytes) {
+      if (input.fileBytes.length === 0) return rejected('invalid_archive')
+      if (input.fileBytes.length > MAX_ARCHIVE_BYTES) return rejected('archive_too_large')
+      const fileSha256 = createHash('sha256').update(input.fileBytes).digest('hex')
+      if (input.expectedFileSha256 !== undefined && input.expectedFileSha256 !== fileSha256) {
+        return rejected('invalid_archive')
+      }
+      const file = new Blob([new Uint8Array(input.fileBytes)], { type: 'application/zip' })
+      return this.submit(input, file, fileSha256)
+    }
+
     let snapshot: ReadableFileSnapshot | undefined
     try {
       try {
@@ -217,14 +229,6 @@ export class CherryDiagnosticUploadClient {
         return rejected('invalid_archive')
       }
 
-      const description = normalizeDiagnosticDescription(input.description)
-      let signatureHeaders
-      try {
-        signatureHeaders = generateDiagnosticUploadHeaders({ description, fileSha256, fileSize: snapshot.size })
-      } catch {
-        return rejected('authentication_failed', fileSha256)
-      }
-
       let file: Blob
       try {
         file = await openAsBlob(input.filePath, { type: 'application/zip' })
@@ -233,44 +237,58 @@ export class CherryDiagnosticUploadClient {
       }
       if (!(await matchesOpenedSnapshot(input.filePath, snapshot))) return rejected('invalid_archive')
 
-      const form = new FormData()
-      form.append('description', description)
-      form.append('file', file, input.fileName)
-
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
-      try {
-        let response: Response
-        try {
-          response = await net.fetch(DIAGNOSTIC_REPORT_BASE_URL, {
-            body: form,
-            headers: { ...signatureHeaders },
-            method: 'POST',
-            redirect: 'manual',
-            signal: controller.signal
-          })
-        } catch {
-          return { fileSha256, status: 'submission_unknown' }
-        }
-
-        if (!response.ok && response.status !== 400) {
-          await cancelBody(response)
-          return rejectedResult(response, fileSha256)
-        }
-
-        try {
-          const body = await readResponseBody(response)
-          return response.ok ? uploadedResult(body, fileSha256) : rejectedResult(response, fileSha256, body)
-        } catch {
-          return response.ok
-            ? { fileSha256, status: 'submission_unknown' }
-            : rejected('submission_rejected', fileSha256)
-        }
-      } finally {
-        clearTimeout(timeout)
-      }
+      return this.submit(input, file, fileSha256)
     } finally {
       await snapshot?.close().catch(() => undefined)
+    }
+  }
+
+  private async submit(
+    input: CherryDiagnosticUploadInput,
+    file: Blob,
+    fileSha256: string
+  ): Promise<CherryDiagnosticUploadResult> {
+    const description = normalizeDiagnosticDescription(input.description)
+    let signatureHeaders
+    try {
+      signatureHeaders = generateDiagnosticUploadHeaders({ description, fileSha256, fileSize: file.size })
+    } catch {
+      return rejected('authentication_failed', fileSha256)
+    }
+
+    const form = new FormData()
+    form.append('description', description)
+    form.append('file', file, input.fileName)
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    try {
+      let response: Response
+      try {
+        response = await net.fetch(DIAGNOSTIC_REPORT_BASE_URL, {
+          body: form,
+          headers: { ...signatureHeaders },
+          method: 'POST',
+          redirect: 'manual',
+          signal: controller.signal
+        })
+      } catch {
+        return { fileSha256, status: 'submission_unknown' }
+      }
+
+      if (!response.ok && response.status !== 400) {
+        await cancelBody(response)
+        return rejectedResult(response, fileSha256)
+      }
+
+      try {
+        const body = await readResponseBody(response)
+        return response.ok ? uploadedResult(body, fileSha256) : rejectedResult(response, fileSha256, body)
+      } catch {
+        return response.ok ? { fileSha256, status: 'submission_unknown' } : rejected('submission_rejected', fileSha256)
+      }
+    } finally {
+      clearTimeout(timeout)
     }
   }
 }

@@ -282,7 +282,10 @@ inspection and typed consumed events via `ProtocolMapping.Events`. `BrowserInspe
 the guest, records only managed sessions, retains recent history across navigation and clears on
 detach/disposal. Managed-tab readiness enables Runtime and Network after the initial blank document;
 GUI navigation waits for that readiness so its initial requests are captured. Annotation-only borrowed
-guests remain lazy. Diagnostic URLs redact credential query values while retaining ordinary parameters.
+guests remain lazy. Network inspection and browser result URLs omit credentials, the entire query string,
+and the fragment. Unsupported schemes are reduced to the scheme and `[content omitted]`.
+Relative snapshot links also omit queries and fragments; element references preserve their original action.
+This does not redact arbitrary page content or secrets embedded in URL paths.
 Text fields cap at 2,000 characters; entry-array output caps at 40,000 serialized
 characters, returning the newest entries with `truncated` when needed. `clear` removes all selected
 entries, including ones omitted by the output cap, without touching the separate settling state.

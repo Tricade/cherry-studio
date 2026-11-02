@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 
 import { Button, Input, RowFlex, Switch, WarnTooltip } from '@cherrystudio/ui'
 import { usePreference } from '@data/hooks/usePreference'
+import { BackupDisclosure } from '@renderer/components/BackupDisclosure'
 import Selector from '@renderer/components/Selector'
 import {
   SettingDivider,
@@ -100,6 +101,7 @@ const WebDavSettings: FC = () => {
   return (
     <SettingGroup theme={theme}>
       <SettingTitle>{t('settings.data.webdav.title')}</SettingTitle>
+      <BackupDisclosure target="webdav" />
       <SettingDivider />
       <SettingRow id="setting-data-webdav-host" className="scroll-mt-6">
         <SettingRowTitle>{t('settings.data.webdav.host.label')}</SettingRowTitle>

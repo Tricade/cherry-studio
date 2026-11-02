@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Input } from '@cherrystudio/ui'
+import { BackupDisclosure } from '@renderer/components/BackupDisclosure'
 import { backupToWebdav } from '@renderer/services/BackupService'
 import { createDefaultBackupFileName } from '@renderer/utils/backupFileName'
 
@@ -12,6 +13,7 @@ interface WebdavModalProps {
   backuping: boolean
   customFileName: string
   setCustomFileName: (value: string) => void
+  target?: 'webdav' | 'nutstore'
   customLabels?: {
     modalTitle?: string
     filenamePlaceholder?: string
@@ -60,7 +62,8 @@ export function WebdavBackupModal({
   backuping,
   customFileName,
   setCustomFileName,
-  customLabels
+  customLabels,
+  target = 'webdav'
 }: WebdavModalProps) {
   const { t } = useTranslation()
 
@@ -70,6 +73,7 @@ export function WebdavBackupModal({
         <DialogHeader>
           <DialogTitle>{customLabels?.modalTitle || t('settings.data.webdav.backup.modal.title')}</DialogTitle>
         </DialogHeader>
+        <BackupDisclosure target={target} />
         <Input
           autoFocus
           value={customFileName}

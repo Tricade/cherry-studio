@@ -12,7 +12,7 @@ import type { BrowserSessionService } from '../BrowserSessionService'
 import type { CommandOptions } from '../browserUse'
 import { BrowserSessionError } from '../session/BrowserSessionError'
 import type { GuestSession } from '../session/GuestSession'
-import { sanitizeSnapshotUrl } from '../snapshot/serializeSnapshot'
+import { sanitizeSnapshotTitle, sanitizeSnapshotUrl } from '../snapshot/serializeSnapshot'
 import { BrowserPageController } from './BrowserPageController'
 
 export interface BrowserSessionBinding {
@@ -162,7 +162,11 @@ export class SessionBrowserController extends BrowserPageController {
         ),
       options
     )
-    return { tabId, currentUrl: sanitizeSnapshotUrl(target.guest.getURL()), title: target.guest.getTitle() }
+    return {
+      tabId,
+      currentUrl: sanitizeSnapshotUrl(target.guest.getURL()),
+      title: sanitizeSnapshotTitle(target.guest.getTitle(), target.guest.getURL())
+    }
   }
 
   takeHostEvents(tabId: string) {
@@ -180,7 +184,13 @@ export class SessionBrowserController extends BrowserPageController {
     if (privateMode) throw new BrowserSessionError('not_allowed')
     const target = this.binding.get()
     return target
-      ? [{ tabId: target.tabId, url: sanitizeSnapshotUrl(target.guest.getURL()), title: target.guest.getTitle() }]
+      ? [
+          {
+            tabId: target.tabId,
+            url: sanitizeSnapshotUrl(target.guest.getURL()),
+            title: sanitizeSnapshotTitle(target.guest.getTitle(), target.guest.getURL())
+          }
+        ]
       : []
   }
   finishTool(): void {

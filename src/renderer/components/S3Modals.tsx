@@ -14,6 +14,7 @@ import {
   Input,
   Spinner
 } from '@cherrystudio/ui'
+import { BackupDisclosure } from '@renderer/components/BackupDisclosure'
 import { backupToS3 } from '@renderer/services/BackupService'
 import { popup } from '@renderer/services/popup'
 import { toast } from '@renderer/services/toast'
@@ -93,6 +94,7 @@ export function S3BackupModal({
         <DialogHeader>
           <DialogTitle>{t('settings.data.s3.backup.modal.title')}</DialogTitle>
         </DialogHeader>
+        <BackupDisclosure target="s3" />
         <Input
           autoFocus
           value={customFileName}

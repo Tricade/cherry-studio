@@ -8,7 +8,7 @@ import { click, hover, scroll } from './actions/mouse'
 import { settleAction } from './actions/settle'
 import type { BrowserController } from './mcp/browserController'
 import { BrowserSessionError } from './session/BrowserSessionError'
-import { sanitizeSnapshotUrl } from './snapshot/serializeSnapshot'
+import { sanitizeSnapshotTitle, sanitizeSnapshotUrl } from './snapshot/serializeSnapshot'
 
 const ref = z.string().min(1)
 const schemas = {
@@ -125,7 +125,7 @@ export async function executeBrowserOperation(
     const metadata = () => ({
       tabId: target.tabId,
       url: sanitizeSnapshotUrl(session.guest.getURL()),
-      title: session.guest.getTitle(),
+      title: sanitizeSnapshotTitle(session.guest.getTitle(), session.guest.getURL()),
       ...(session.pendingDialog ? { dialog: session.pendingDialog } : {}),
       ...session.takeEvents(),
       ...controller.takeHostEvents?.(target.tabId)

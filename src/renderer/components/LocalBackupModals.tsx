@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Input } from '@cherrystudio/ui'
 import { loggerService } from '@logger'
+import { BackupDisclosure } from '@renderer/components/BackupDisclosure'
 import { backupToLocal } from '@renderer/services/BackupService'
 import { createDefaultBackupFileName } from '@renderer/utils/backupFileName'
 
@@ -33,6 +34,7 @@ export function LocalBackupModal({
         <DialogHeader>
           <DialogTitle>{t('settings.data.local.backup.modal.title')}</DialogTitle>
         </DialogHeader>
+        <BackupDisclosure target="local" />
         <Input
           autoFocus
           value={customFileName}

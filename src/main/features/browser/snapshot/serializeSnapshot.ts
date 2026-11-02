@@ -18,19 +18,29 @@ export function sanitizeSnapshotUrl(input: string): string {
   let url = input
   try {
     const parsed = new URL(url)
+    if (!['http:', 'https:', 'file:', 'about:'].includes(parsed.protocol)) {
+      return `${parsed.protocol}[content omitted]`
+    }
     parsed.username = ''
     parsed.password = ''
-    url = parsed.protocol === 'data:' ? 'data:[content omitted]' : parsed.href
+    parsed.search = ''
+    parsed.hash = ''
+    url = parsed.href
   } catch {
     url = '[unavailable]'
   }
   return url
 }
 
+export function sanitizeSnapshotTitle(title: string, url: string): string {
+  return title === url ? sanitizeSnapshotUrl(url) : title
+}
+
 export function serializeSnapshot(snapshot: BrowserSnapshot, maxChars: number): SnapshotRevision {
   const lines = new Map<number, string>()
   const url = sanitizeSnapshotUrl(snapshot.url)
-  const metadata = `${url} · ${snapshot.title}`.replace(/\s+/g, ' ').slice(0, Math.floor(maxChars / 3))
+  const title = sanitizeSnapshotTitle(snapshot.title, snapshot.url)
+  const metadata = `${url} · ${title}`.replace(/\s+/g, ' ').slice(0, Math.floor(maxChars / 3))
   const makeHeader = () =>
     `${SAFETY_NOTICE}\n${metadata} · ${[...lines.keys()].filter((id) => interactive.has(id)).length} interactive / ${lines.size} total`
   const interactive = new Set(snapshot.nodes.filter((node) => node.ref).map((node) => node.backendNodeId))

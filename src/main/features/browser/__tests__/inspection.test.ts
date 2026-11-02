@@ -108,10 +108,10 @@ describe('per-guest browser inspection', () => {
     expect(JSON.stringify(session.consoleMessages())).not.toContain('REMOTE_HANDLE')
   })
 
-  it('redacts credential query parameters from diagnostics while retaining ordinary query data', () => {
+  it('omits all query and fragment data from model-facing inspection URLs', () => {
     const { session, request, emit } = setup()
     const source =
-      'https://user:SECRET@example.com/script.js?page=2&access%5Ftoken=SECRET&ApiKey=SECRET&code=SECRET&signature=SECRET'
+      'https://user:SECRET@example.com/script.js?page=2&unknown=SECRET&access%5Ftoken=SECRET&code=SECRET#SECRET'
     request('redirect', source)
     request('redirect', 'https://example.com/result?q=hello&SESSION_id=SECRET', { redirectResponse: { status: 302 } })
     emit('Runtime.consoleAPICalled', {
@@ -130,12 +130,11 @@ describe('per-guest browser inspection', () => {
       const parsed = new URL(url)
       expect(parsed.username).toBe('')
       expect(parsed.password).toBe('')
-      expect(parsed.searchParams.get('page')).toBe('2')
-      for (const key of ['access_token', 'ApiKey', 'code', 'signature'])
-        expect(parsed.searchParams.get(key)).toBe('<redacted>')
+      expect(parsed.search).toBe('')
+      expect(parsed.hash).toBe('')
+      expect(parsed.pathname).toBe('/script.js')
     }
-    expect(new URL(requests[1].url).searchParams.get('q')).toBe('hello')
-    expect(new URL(requests[1].url).searchParams.get('SESSION_id')).toBe('<redacted>')
+    expect(requests[1].url).toBe('https://example.com/result')
   })
 
   it('keeps redirect hops and correlates completion/failure without exposing headers or bodies', () => {

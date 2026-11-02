@@ -103,8 +103,27 @@ export const diagnosticsRequestSchemas = {
     ])
   }),
   'diagnostics.bundle.upload': defineRoute({
-    input: diagnosticUploadInputSchema,
+    input: z.object({ bundleId: z.string().uuid(), confirmed: z.literal(true) }).strict(),
     output: diagnosticUploadResultSchema
+  }),
+  'diagnostics.bundle.prepare_upload': defineRoute({
+    input: diagnosticUploadInputSchema,
+    output: z.discriminatedUnion('status', [
+      z.object({ status: z.literal('busy') }),
+      diagnosticRetainedUploadSchema.extend({
+        status: z.literal('prepared'),
+        description: z.string(),
+        destination: z.url(),
+        archiveBytes: z.number().int().nonnegative(),
+        fileSha256: z.string(),
+        hasWarnings: z.boolean(),
+        entries: z.array(z.object({ name: z.string(), bytes: z.number().int().nonnegative() }))
+      })
+    ])
+  }),
+  'diagnostics.bundle.preview_entry': defineRoute({
+    input: z.object({ bundleId: z.string().uuid(), name: z.string(), offset: z.number().int().nonnegative() }).strict(),
+    output: z.object({ text: z.string(), nextOffset: z.number().int().nonnegative().nullable() })
   }),
   'diagnostics.bundle.retry_upload': defineRoute({
     input: z.object({ bundleId: z.string().uuid() }).strict(),

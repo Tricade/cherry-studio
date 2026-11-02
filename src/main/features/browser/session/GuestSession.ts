@@ -23,7 +23,12 @@ import { buildSnapshotTree } from '../snapshot/buildSnapshotTree'
 import { captureSnapshot } from '../snapshot/captureSnapshot'
 import { createAccessibilityContext, describeElement } from '../snapshot/describeElement'
 import { diffSnapshot } from '../snapshot/diffSnapshot'
-import { sanitizeSnapshotUrl, serializeSnapshot, type SnapshotRevision } from '../snapshot/serializeSnapshot'
+import {
+  sanitizeSnapshotTitle,
+  sanitizeSnapshotUrl,
+  serializeSnapshot,
+  type SnapshotRevision
+} from '../snapshot/serializeSnapshot'
 import { BrowserInspection, type ConsoleLevel } from './BrowserInspection'
 import { BrowserSessionError } from './BrowserSessionError'
 import { cdpAllowList, type CdpCommandArgs, type CdpEvent, cdpEventMethods, type CdpMethod } from './cdpAllowList'
@@ -525,7 +530,7 @@ export class GuestSession implements Disposable {
           ...tree,
           documentId: this.documentId,
           url: sanitizeSnapshotUrl(url),
-          title: title === url ? sanitizeSnapshotUrl(title) : title,
+          title: sanitizeSnapshotTitle(title, url),
           truncated: false
         }
         const maxChars = opts.maxChars ?? 40_000
