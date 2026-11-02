@@ -1,5 +1,5 @@
 # Bilingual-pair consistency record (docs/dev/i18n/README.md).
 # After editing either side, update its counterpart and re-record with:
 #   pnpm docs:check-pairing --write .agents/notes/proposed/feature/2026-11-02-private-project-workspaces.md
-2026-11-02-private-project-workspaces.md: 09b555776f519d937434189f5bf0ac10ed25e2a9
-2026-11-02-private-project-workspaces.zh.md: 3531707b837ef5dd51f338b0412a637e958249e2
+2026-11-02-private-project-workspaces.md: 8e833efc3c4f122f2c38f5a1d611433eabbb1003
+2026-11-02-private-project-workspaces.zh.md: 2f32d6761ac48ffbf145f0ee0fd3fe5ace3ef358

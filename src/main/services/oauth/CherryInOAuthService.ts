@@ -209,6 +209,32 @@ export class CherryInOAuthService {
     }
   }
 
+  public async getQuotaSnapshot(apiHost: string, signal: AbortSignal): Promise<{ quota: number; used_quota: number }> {
+    this.validateApiHost(apiHost)
+    const oauth = application.get('OAuthRuntimeService')
+    let requestedToken: string | undefined
+    const response = await oauth.authenticatedFetch(
+      SystemProviderIds.cherryin,
+      (credentials) => {
+        requestedToken = credentials.accessToken
+        return {
+          input: `${apiHost}/api/v1/oauth/balance`,
+          init: { signal, headers: { Authorization: `Bearer ${credentials.accessToken}` } }
+        }
+      },
+      (input, init) => net.fetch(input as RequestInfo, init),
+      { context: { apiHost } }
+    )
+    if (!response.ok) throw new CherryInOAuthServiceError('Balance request failed')
+    const result = BalanceResponseSchema.parse(await response.json())
+    if (!result.success) throw new CherryInOAuthServiceError('Balance is unavailable')
+    const current = await oauth.getValidAccessToken(SystemProviderIds.cherryin, { apiHost })
+    signal.throwIfAborted()
+    if (!requestedToken || current?.accessToken !== requestedToken)
+      throw new CherryInOAuthServiceError('Account changed during balance request')
+    return result.data
+  }
+
   public getBalance = async (apiHost: string): Promise<CherryInBalance> => {
     this.validateApiHost(apiHost)
 
