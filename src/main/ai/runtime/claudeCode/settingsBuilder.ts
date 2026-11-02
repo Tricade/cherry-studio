@@ -17,7 +17,6 @@ import type { CanUseTool, Options, PermissionResult, SdkPluginConfig } from '@an
 import { application } from '@application'
 import { agentService } from '@data/services/AgentService'
 import { loggerService } from '@logger'
-import { ensureAgentDataDirectory } from '@main/ai/agents/agentDataDirectory'
 import {
   resolveAgentCapabilities,
   resolveAutomationAccess,
@@ -35,6 +34,12 @@ import {
   resolveAgentNotificationContext,
   resolveLinkedNotifyChannel
 } from '@main/ai/runtime/agentMcpServers'
+import {
+  type AgentProjectContext,
+  ensureSessionAgentDataDirectory,
+  getAgentProjectContext,
+  resolveAgentProjectKnowledgeScope
+} from '@main/ai/runtime/agentProjectContext'
 import { buildAgentRuntimePrompt } from '@main/ai/runtime/agentPrompt'
 import {
   AgentSessionWorkspaceError,
@@ -54,7 +59,6 @@ import {
 } from '@main/ai/toolApproval/builtinToolPolicy'
 import { toolApprovalRegistry } from '@main/ai/toolApproval/ToolApprovalRegistry'
 import { type ClaudeToolContext, resolveDisallowedTools } from '@main/ai/tools/adapters/claudeCode/toolConditions'
-import { resolveKnowledgeBaseScope } from '@main/ai/utils/knowledgeScope'
 import { AGENT_RUNTIME_CAPABILITIES } from '@shared/ai/agentRuntimeCapabilities'
 import {
   KB_READ_TOOL_NAME,
@@ -120,6 +124,7 @@ export function registerMcpSessionCatalogSync(
 // ── Input types ─────────────────────────────────────────────────────
 
 export interface ClaudeCodeSessionOptions {
+  project?: AgentProjectContext | null
   lastAgentSessionId?: string
   /** Whether the connection model accepts native image input. */
   supportsImages?: boolean
@@ -170,6 +175,8 @@ export async function buildClaudeCodeSessionSettings(
   if (!agent) {
     throw new Error(`Agent not found for session ${session.id}: ${session.agentId}`)
   }
+  const project =
+    options?.project === undefined ? getAgentProjectContext(session, agent.id) : (options.project ?? undefined)
   const agentConfig = agent.configuration
   const builtinRole = agentConfig?.builtin_role as string | undefined
   const builtinPluginDirectory = builtinRole ? getBuiltinAgentPluginDirectory(builtinRole) : undefined
@@ -191,7 +198,7 @@ export async function buildClaudeCodeSessionSettings(
   await prepareClaudeCodeWorkspaceDirectory(session)
   const mcpWarmPromise = warmAgentMcpToolCaches(agent)
   const [agentDataPath, env, workspacePlugins] = await Promise.all([
-    ensureAgentDataDirectory(application.getPath('feature.agents.data'), agent.id),
+    ensureSessionAgentDataDirectory(agent.id, project),
     buildEnvironment(provider, agent),
     discoverPlugins(cwd, agent.id)
   ])
@@ -232,14 +239,19 @@ export async function buildClaudeCodeSessionSettings(
   // 5. System prompt. The citation guidance is gated on the same resolved scope that decides whether
   // step 6 exposes the kb_* tools — a composer-only selection on an unbound agent still gets them, and
   // without the guidance the model would never emit the `[cite:id]` markers those results need.
-  const knowledgeBaseScope = resolveKnowledgeBaseScope(agent.knowledgeBaseIds, options?.knowledgeBaseIds)
+  const knowledgeBaseScope = resolveAgentProjectKnowledgeScope(
+    project,
+    agent.knowledgeBaseIds,
+    options?.knowledgeBaseIds
+  )
   const systemPrompt = await buildSystemPrompt(
     agent,
     cwd,
     agentDataPath,
     knowledgeBaseScope,
     disallowedTools,
-    options?.effectiveLanguage
+    options?.effectiveLanguage,
+    project
   )
 
   // 6. MCP servers (session + built-in)
@@ -654,9 +666,10 @@ export async function buildSystemPrompt(
   /** Final SDK visibility after declarative exposure, runtime gates, and dependency propagation. */
   disallowedTools: readonly string[] = resolveDisallowedTools({ disabledTools: agent.disabledTools }, { cwd }),
   /** Materialized effective language; when omitted the preference is read live. */
-  effectiveLanguage?: string | null
+  effectiveLanguage?: string | null,
+  project?: AgentProjectContext
 ): Promise<ClaudeCodeSettings['systemPrompt']> {
-  const canReadAllKnowledgeBases = resolveAgentCapabilities(agent).allKnowledgeBases
+  const canReadAllKnowledgeBases = !project && resolveAgentCapabilities(agent).allKnowledgeBases
   const unavailableTools = new Set(disallowedTools)
   const isLookupEnabled = (toolName: string) => !unavailableTools.has(toCherryBuiltinRuntimeName(toolName))
   const citationsGuidance = buildCitationsGuidance({
@@ -676,7 +689,8 @@ export async function buildSystemPrompt(
     agent,
     citationsGuidance,
     customBaseContext,
-    effectiveLanguage
+    effectiveLanguage,
+    project
   })
 
   // Rebuilding and resuming must apply changed Cherry instructions without waiting for compaction.

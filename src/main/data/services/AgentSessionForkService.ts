@@ -69,6 +69,7 @@ export class AgentSessionForkService {
     if (
       current.agent.type !== source.agent.type ||
       current.agent.id !== source.agent.id ||
+      current.session.projectId !== source.session.projectId ||
       current.workspace.id !== source.workspace.id ||
       current.workspace.path !== source.workspace.path ||
       JSON.stringify(current.messages) !== JSON.stringify(source.messages)
@@ -100,6 +101,7 @@ export class AgentSessionForkService {
       input.targetSessionId,
       {
         agentId: source.agent.id,
+        projectId: source.session.projectId ?? undefined,
         name: `${baseName}${separator}(${number})`,
         description: source.session.description,
         workspace:

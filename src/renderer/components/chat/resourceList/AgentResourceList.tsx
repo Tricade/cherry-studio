@@ -70,6 +70,7 @@ type AgentResourceListProps = {
   onAddAgent?: () => void | Promise<void>
   onOpenHistoryRecords?: () => void
   onManageAgents?: () => void | Promise<void>
+  onManageProjects?: () => void
   onSelectSession: (sessionId: string, session: AgentSessionEntity) => void
   onSelectedAgentClick?: () => void | Promise<void>
   onCreateSession: (agentId: string) => Promise<AgentSessionEntity | null>
@@ -92,6 +93,7 @@ export function AgentResourceList({
   onAddAgent,
   onOpenHistoryRecords,
   onManageAgents,
+  onManageProjects,
   onSelectSession,
   onSelectedAgentClick,
   onCreateSession,
@@ -566,6 +568,7 @@ export function AgentResourceList({
             mode={sessionDisplayMode}
             onChange={(nextMode) => void setSessionDisplayMode(nextMode)}
             onManageAgents={onManageAgents}
+            onManageProjects={onManageProjects}
             onOpenHistoryRecords={onOpenHistoryRecords}
           />
         }

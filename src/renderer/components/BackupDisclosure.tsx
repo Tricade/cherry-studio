@@ -57,6 +57,7 @@ export function BackupDisclosure({ target, forceFull = false }: { target: Backup
       description={
         <div className="space-y-2 break-words">
           <p>{t(slim ? 'backup.disclosure.slim' : 'backup.disclosure.full')}</p>
+          <p>{t('backup.disclosure.project_memory')}</p>
           <p>{t('backup.disclosure.credentials')}</p>
           <p>{t('backup.disclosure.external')}</p>
           <p>

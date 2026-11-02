@@ -28,6 +28,7 @@ type ConversationListSectionToggle = {
 type ConversationListOptionsMenuProps<TMode extends string> = {
   historyAction?: ConversationListMenuAction
   manageAction?: ConversationListMenuAction
+  projectAction?: ConversationListMenuAction
   mode: TMode
   onChange: (mode: TMode) => void
   options: readonly ConversationListOption<TMode>[]
@@ -38,6 +39,7 @@ type ConversationListOptionsMenuProps<TMode extends string> = {
 export function ConversationListOptionsMenu<TMode extends string>({
   historyAction,
   manageAction,
+  projectAction,
   mode,
   onChange,
   options,
@@ -107,6 +109,12 @@ export function ConversationListOptionsMenu<TMode extends string>({
             <>
               <MenuDivider />
               {renderAction(manageAction)}
+            </>
+          )}
+          {projectAction && (
+            <>
+              <MenuDivider />
+              {renderAction(projectAction)}
             </>
           )}
         </MenuList>

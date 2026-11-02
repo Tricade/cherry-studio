@@ -38,6 +38,8 @@ the child's workspace; selecting an earlier turn does not restore historical fil
 versions. Copying detects file changes and can fail with `workspace_changed`.
 Shared-workspace editing remains the responsibility of the sessions using it.
 
+A project session's fork retains its `projectId`, shared workspace and project context. The commit rechecks the source project association and current team membership; it cannot silently publish a child into an unrelated project. Existing conversation history remains visible after a member is removed, but that member cannot start another turn until re-added.
+
 ## Ownership and dependencies
 
 ```mermaid

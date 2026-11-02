@@ -56,6 +56,7 @@ import AgentSidePanel from './AgentSidePanel'
 import { AgentCreateDialog } from './components/AgentCreateDialog'
 import type { AgentFileNavigationRequest } from './components/AgentRightPane'
 import { AgentTabRuntime } from './components/AgentTabRuntime'
+import { ProjectsDialog } from './components/ProjectsDialog'
 import Sessions from './components/Sessions'
 import {
   createFeedbackComposerLaunch,
@@ -231,6 +232,8 @@ const AgentPage = () => {
   const [missingAgentSelection, setMissingAgentSelection] = useState(false)
   const [pendingSessionDefaults, setPendingSessionDefaults] = useState<CreateAgentSessionDefaults | null>(null)
   const [agentCreateOpen, setAgentCreateOpen] = useState(false)
+  const [projectsDialog, setProjectsDialog] = useState<{ projectId?: string } | null>(null)
+  const openProjects = useCallback((projectId?: string) => setProjectsDialog({ projectId }), [])
   const invalidateCache = useInvalidateCache()
   const closeConversationTabs = useCloseConversationTabs()
   const { setSessionWorkspace } = useUpdateSession()
@@ -473,6 +476,15 @@ const AgentPage = () => {
   const resolveEmptySession = useCallback(
     async (agentId: string, defaults: CreateAgentSessionDefaults = {}): Promise<AgentSessionEntity> => {
       const workspaceSource = await resolveCreateWorkspaceSource(defaults, visibleSession)
+      const projectId =
+        defaults.projectId ?? (Object.keys(defaults).length === 0 ? visibleSession?.projectId : undefined)
+      if (projectId) {
+        const session = await dataApiService.post('/agent-sessions', {
+          body: { agentId, projectId, name: '', workspace: workspaceSource }
+        })
+        await invalidateCache(['/agent-sessions', `/agent-sessions/${session.id}`])
+        return session
+      }
       const result = await reuseOrCreateSession(agentId, workspaceSource)
 
       closeConversationTabs('agents', result.deletedDuplicateSessionIds)
@@ -1035,6 +1047,7 @@ const AgentPage = () => {
         onShowMissingAgentSelection={showMissingAgentSelection}
         manageAgentsActive={manageAgentsActive}
         onManageAgents={onManageAgents}
+        onManageProjects={openProjects}
         onActiveAgentDeleted={handleActiveAgentDeleted}
       />
     ) : (
@@ -1055,6 +1068,7 @@ const AgentPage = () => {
         panePosition="left"
         manageAgentsActive={manageAgentsActive}
         onManageAgents={onManageAgents}
+        onManageProjects={openProjects}
         setActiveSessionId={setActiveSessionAndClearTransient}
       />
     )
@@ -1182,6 +1196,19 @@ const AgentPage = () => {
           onOpenChange={setAgentCreateOpen}
           onCreated={handleAgentConversationSelect}
         />
+        {projectsDialog && (
+          <ProjectsDialog
+            initialProjectId={projectsDialog.projectId}
+            onClose={() => setProjectsDialog(null)}
+            onStart={async (defaults) => {
+              const session = await createAndActivateEmptySession(defaults)
+              if (session) {
+                await setSessionDisplayMode('project')
+                setProjectsDialog(null)
+              }
+            }}
+          />
+        )}
       </Container>
     </>
   )

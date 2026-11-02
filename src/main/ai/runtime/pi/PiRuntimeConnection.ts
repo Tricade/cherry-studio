@@ -16,10 +16,13 @@ import { fetch as nodeFetch } from 'undici'
 
 import { application } from '@application'
 import { loggerService } from '@logger'
-import { ensureAgentDataDirectory } from '@main/ai/agents/agentDataDirectory'
 import { resolveAgentCapabilities, resolveMountedMcpServers } from '@main/ai/agents/builtin/builtinAgentCapabilities'
 import { endAgentRuntimeSpan, startAgentRuntimeChildSpan } from '@main/ai/observability'
 import { buildAgentMcpServers, warmAgentMcpToolCatalogs } from '@main/ai/runtime/agentMcpServers'
+import {
+  ensureSessionAgentDataDirectory,
+  resolveAgentProjectKnowledgeScope
+} from '@main/ai/runtime/agentProjectContext'
 import { buildAgentRuntimePrompt } from '@main/ai/runtime/agentPrompt'
 import { prepareAgentSessionWorkspaceDirectory } from '@main/ai/runtime/agentSessionWorkspace'
 import { buildAgentUserContent } from '@main/ai/runtime/agentUserContent'
@@ -29,7 +32,6 @@ import { CHERRY_MCP_SERVER, listBuiltinToolPolicies } from '@main/ai/toolApprova
 import { toolApprovalRegistry } from '@main/ai/toolApproval/ToolApprovalRegistry'
 import { chatErrorContext } from '@main/ai/utils/chatErrorContext'
 import { customFetch } from '@main/ai/utils/customFetch'
-import { resolveKnowledgeBaseScope } from '@main/ai/utils/knowledgeScope'
 import { createAiUsageCaptureContext } from '@main/ai/utils/usageCapture'
 import { modelService } from '@main/data/services/ModelService'
 import { providerService } from '@main/data/services/ProviderService'
@@ -301,15 +303,20 @@ export class PiRuntimeConnection implements AgentRuntimeConnection {
       // via `additionalSkillPaths` below; disk auto-discovery stays off (see comment).
       const additionalSkillPaths = [...initialSnapshot.additionalSkillPaths]
 
-      const agentDataPath = await ensureAgentDataDirectory(application.getPath('feature.agents.data'), agent.id)
+      const project = initialSnapshot.project
+      const agentDataPath = await ensureSessionAgentDataDirectory(agent.id, project)
       const linkedChannel = initialSnapshot.linkedChannel
-      const knowledgeBaseScope = resolveKnowledgeBaseScope(agent.knowledgeBaseIds, this.input.knowledgeBaseIds)
+      const knowledgeBaseScope = resolveAgentProjectKnowledgeScope(
+        project,
+        agent.knowledgeBaseIds,
+        this.input.knowledgeBaseIds
+      )
       const isToolEnabled = (serverName: string, toolName: string) =>
         !this.disabledTools.has(buildPiMcpToolName(serverName, toolName))
       const citationsGuidance = buildCitationsGuidance({
         web: isToolEnabled('cherry-tools', WEB_SEARCH_TOOL_NAME) || isToolEnabled('cherry-tools', WEB_FETCH_TOOL_NAME),
         kb:
-          (resolveAgentCapabilities(agent).allKnowledgeBases || knowledgeBaseScope.length > 0) &&
+          ((!project && resolveAgentCapabilities(agent).allKnowledgeBases) || knowledgeBaseScope.length > 0) &&
           (isToolEnabled('cherry-tools', KB_SEARCH_TOOL_NAME) || isToolEnabled('cherry-tools', KB_READ_TOOL_NAME))
       })
       const prompt = await buildAgentRuntimePrompt({
@@ -317,6 +324,7 @@ export class PiRuntimeConnection implements AgentRuntimeConnection {
         agentDataPath,
         agent,
         citationsGuidance,
+        project,
         effectiveLanguage: initialSnapshot.effectiveLanguage
       })
       const mountedServers = resolveMountedMcpServers(agent, {

@@ -20,6 +20,7 @@ describe('endpoint classification', () => {
   it('pins the collection classification snapshot (update deliberately on schema changes)', () => {
     expectTypeOf<CollectionGetPaths>().toEqualTypeOf<
       | '/agent-channels'
+      | '/agent-projects'
       | '/agent-sessions'
       | '/agent-sessions/:sessionId/messages'
       | '/agent-tasks'

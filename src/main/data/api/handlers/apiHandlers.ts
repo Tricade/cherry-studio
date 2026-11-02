@@ -14,6 +14,7 @@
 import type { ApiImplementation } from '@shared/data/api/types'
 
 import { agentChannelHandlers } from './agentChannels'
+import { agentProjectHandlers } from './agentProjects'
 import { agentHandlers } from './agents'
 import { agentSessionMessageHandlers } from './agentSessionMessages'
 import { agentSessionHandlers } from './agentSessions'
@@ -52,6 +53,7 @@ import { translateHandlers } from './translate'
  * TypeScript ensures exhaustive coverage - missing handlers cause compile errors.
  */
 export const apiHandlers: ApiImplementation = {
+  ...agentProjectHandlers,
   ...apiGatewayPairedDeviceHandlers,
   ...agentHandlers,
   ...archiveHandlers,

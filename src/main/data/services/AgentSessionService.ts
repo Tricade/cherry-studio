@@ -17,6 +17,7 @@ import { pinTable } from '@data/db/schemas/pin'
 import { defaultHandlersFor, withSqliteErrors } from '@data/db/sqliteErrors'
 import type { DbOrTx } from '@data/db/types'
 import { agentChannelService } from '@data/services/AgentChannelService'
+import { agentProjectService } from '@data/services/AgentProjectService'
 import { agentWorkspaceService, rowToAgentWorkspace } from '@data/services/AgentWorkspaceService'
 import { getDataService } from '@data/services/dataServiceRegistry'
 import { pinService } from '@data/services/PinService'
@@ -103,6 +104,7 @@ function rowToSession(row: JoinedSessionRow): AgentSessionEntity {
     id: clean.id,
     // agentId is legitimately nullable (orphans only via cascade) — preserve T | null.
     agentId: row.session.agentId,
+    projectId: clean.projectId,
     name: clean.name,
     isNameManuallyEdited: clean.isNameManuallyEdited,
     description: clean.description,
@@ -291,6 +293,13 @@ export class AgentSessionService {
   ): void {
     this.assertAgentExistsTx(tx, dto.agentId)
 
+    if (dto.projectId && (type !== 'conversation' || dto.workspace.type !== AGENT_WORKSPACE_TYPE.USER)) {
+      throw DataApiErrorFactory.invalidOperation(
+        'create project session',
+        'Project sessions require their shared user workspace'
+      )
+    }
+
     let workspaceId: string
     switch (dto.workspace.type) {
       case AGENT_WORKSPACE_TYPE.USER: {
@@ -317,10 +326,12 @@ export class AgentSessionService {
       }
     }
 
+    if (dto.projectId) agentProjectService.assertSessionScopeTx(tx, dto.projectId, dto.agentId, workspaceId)
     this.insertTx(tx, {
       id,
       type,
       agentId: dto.agentId,
+      projectId: dto.projectId,
       name: dto.name,
       description: dto.description,
       workspaceId,
@@ -584,6 +595,7 @@ export class AgentSessionService {
               and(
                 conversationFilter,
                 eq(sessionsTable.agentId, dto.agentId),
+                isNull(sessionsTable.projectId),
                 isNull(sessionsTable.deletedAt),
                 workspaceFilter,
                 dto.excludeSessionId ? notInArray(sessionsTable.id, [dto.excludeSessionId]) : undefined,
@@ -702,6 +714,7 @@ export class AgentSessionService {
     const cursor = decodePinnedListCursor(query.cursor, 'agent-session')
     const agentFilter = query.agentId ? eq(sessionsTable.agentId, query.agentId) : undefined
     const workspaceFilter = query.workspaceId ? eq(sessionsTable.workspaceId, query.workspaceId) : undefined
+    const projectFilter = query.projectId ? eq(sessionsTable.projectId, query.projectId) : undefined
     const idFilter = query.ids ? inArray(sessionsTable.id, query.ids) : undefined
     const inTrash = query.inTrash === true
     const activeAgentFilter = !inTrash && query.agentId ? isNotNull(agentsTable.id) : undefined
@@ -726,6 +739,7 @@ export class AgentSessionService {
             conversationFilter,
             agentFilter,
             workspaceFilter,
+            projectFilter,
             idFilter,
             activeAgentFilter,
             isNull(sessionsTable.deletedAt),
@@ -784,6 +798,7 @@ export class AgentSessionService {
           conversationFilter,
           agentFilter,
           workspaceFilter,
+          projectFilter,
           idFilter,
           activeAgentFilter,
           inTrash ? isNotNull(sessionsTable.deletedAt) : isNull(sessionsTable.deletedAt),
@@ -840,13 +855,21 @@ export class AgentSessionService {
     patch: UpdateAgentSessionDto
   ): { row: SessionRow | undefined; clearedTaskScheduleIds: string[] } {
     const [current] = tx
-      .select({ agentId: sessionsTable.agentId, taskScheduleId: sessionsTable.taskScheduleId })
+      .select({
+        agentId: sessionsTable.agentId,
+        taskScheduleId: sessionsTable.taskScheduleId,
+        projectId: sessionsTable.projectId,
+        workspaceId: sessionsTable.workspaceId
+      })
       .from(sessionsTable)
       .where(and(eq(sessionsTable.id, id), isNull(sessionsTable.deletedAt)))
       .limit(1)
       .all()
     if (!current) return { row: undefined, clearedTaskScheduleIds: [] }
     if (patch.agentId !== undefined) this.assertAgentExistsTx(tx, patch.agentId)
+    if (patch.agentId !== undefined && current.projectId) {
+      agentProjectService.assertSessionScopeTx(tx, current.projectId, patch.agentId, current.workspaceId)
+    }
 
     const reassigned = patch.agentId !== undefined && patch.agentId !== current.agentId
     const clearedTaskScheduleIds = reassigned && current.taskScheduleId ? [current.taskScheduleId] : []
@@ -883,6 +906,15 @@ export class AgentSessionService {
 
   setWorkspaceTx(tx: DbOrTx, id: string, source: AgentSessionWorkspaceSource): void {
     const current = this.getJoinedSessionRowTx(tx, id)
+    if (
+      current.session.projectId &&
+      (source.type !== AGENT_WORKSPACE_TYPE.USER || source.workspaceId !== current.session.workspaceId)
+    ) {
+      throw DataApiErrorFactory.invalidOperation(
+        'change project workspace',
+        'A project session stays in its project workspace'
+      )
+    }
     // The workspace binding is locked the moment a session has any message.
     this.assertSessionHasNoMessagesTx(tx, id)
 
@@ -940,6 +972,7 @@ export class AgentSessionService {
       id: string
       agentId: string
       name: string
+      projectId?: string
       description?: string
       workspaceId: string
       createdAt: number
@@ -1211,6 +1244,7 @@ export class AgentSessionService {
   deleteWorkspaceCascadeWithImpact(workspaceId: string): AgentSessionDeletionOutcome {
     const result = application.get('DbService').withWriteTx((tx) => {
       agentWorkspaceService.getRowByIdTx(tx, workspaceId)
+      agentWorkspaceService.assertNoProjectReferencesTx(tx, workspaceId)
       const channelReferences = agentChannelService.resetWorkspaceReferencesTx(tx, workspaceId)
       const taskReferences = getDataService('AgentTaskService').resetWorkspaceReferencesTx(tx, workspaceId)
       const taskScheduleIds = this.getTaskScheduleIdsForWorkspaceTx(tx, workspaceId)

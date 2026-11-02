@@ -15,10 +15,14 @@ import {
   resolveAgentNotificationContext,
   resolveLinkedNotifyChannel
 } from '@main/ai/runtime/agentMcpServers'
+import {
+  type AgentProjectContext,
+  getAgentProjectContext,
+  resolveAgentProjectKnowledgeScope
+} from '@main/ai/runtime/agentProjectContext'
 import { isAutomationSkillAvailable } from '@main/ai/skills/automationSkills'
 import { skillService } from '@main/ai/skills/SkillService'
 import { getEffectiveAgentLanguage } from '@main/ai/utils/agentLanguage'
-import { resolveKnowledgeBaseScope } from '@main/ai/utils/knowledgeScope'
 import type { AgentEntity } from '@shared/data/api/schemas/agents'
 import type { AgentSessionEntity } from '@shared/data/api/schemas/agentSessions'
 import { type Model, parseUniqueModelId, type UniqueModelId } from '@shared/data/types/model'
@@ -40,6 +44,7 @@ function stableValue(value: unknown): unknown {
 export interface PiConnectionSnapshot {
   agent: AgentEntity
   session: AgentSessionEntity
+  project?: AgentProjectContext
   provider: Provider
   model: Model
   enabledApiKeys: readonly ApiKeyEntry[]
@@ -78,6 +83,7 @@ export async function capturePiConnectionSnapshot(
   }
 
   const modelId = requestedModelId ?? agent.model
+  const project = getAgentProjectContext(session, agent.id)
   const parsed = parseUniqueModelId(modelId)
   const provider = providerService.getByProviderId(parsed.providerId)
   const model = modelService.getByKey(parsed.providerId, parsed.modelId)
@@ -116,6 +122,7 @@ export async function capturePiConnectionSnapshot(
         stableValue({
           agent: { ...agent, updatedAt: undefined, configuration },
           session: { workspaceId: session.workspaceId, workspace: session.workspace },
+          project,
           modelId,
           provider,
           model,
@@ -129,7 +136,11 @@ export async function capturePiConnectionSnapshot(
           notificationContext,
           browserEnabled: application.get('PreferenceService').get('app.browser.agent_control.enabled'),
           computerUseEnabled: application.get('PreferenceService').get('app.computer_use.agent_control.enabled'),
-          knowledgeBaseIds: resolveKnowledgeBaseScope(agent.knowledgeBaseIds, selectedKnowledgeBaseIds),
+          knowledgeBaseIds: resolveAgentProjectKnowledgeScope(
+            project,
+            agent.knowledgeBaseIds,
+            selectedKnowledgeBaseIds
+          ),
           effectiveLanguage,
           gatewayCredentials
         })
@@ -140,6 +151,7 @@ export async function capturePiConnectionSnapshot(
   return {
     agent,
     session,
+    project,
     provider,
     model,
     enabledApiKeys: apiKeys,

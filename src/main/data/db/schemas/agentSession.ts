@@ -2,6 +2,7 @@ import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 import { createUpdateDeleteTimestamps, orderKeyColumns, orderKeyIndex, uuidPrimaryKey } from './_columnHelpers'
 import { agentTable } from './agent'
+import { agentProjectTable } from './agentProject'
 import { agentWorkspaceTable } from './agentWorkspace'
 import { jobScheduleTable } from './job'
 
@@ -13,6 +14,7 @@ export const agentSessionTable = sqliteTable(
       .notNull()
       .default('conversation'),
     agentId: text().references(() => agentTable.id, { onDelete: 'set null' }),
+    projectId: text().references(() => agentProjectTable.id, { onDelete: 'restrict' }),
     name: text().notNull(),
     // Whether the name was manually edited by user.
     isNameManuallyEdited: integer({ mode: 'boolean' }).notNull().default(false),
@@ -35,6 +37,7 @@ export const agentSessionTable = sqliteTable(
   (t) => [
     orderKeyIndex('agent_session')(t),
     index('agent_session_last_activity_at_idx').on(t.lastActivityAt),
+    index('agent_session_project_id_idx').on(t.projectId),
     index('agent_session_updated_at_idx').on(t.updatedAt)
   ]
 )

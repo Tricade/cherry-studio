@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vite
 
 import { application } from '@application'
 import { agentTable } from '@data/db/schemas/agent'
+import { agentProjectTable } from '@data/db/schemas/agentProject'
 import { agentSessionTable } from '@data/db/schemas/agentSession'
 import { agentSessionMessageTable } from '@data/db/schemas/agentSessionMessage'
 import { agentWorkspaceTable } from '@data/db/schemas/agentWorkspace'
@@ -66,6 +67,7 @@ describe('sweepAgentOrphans', () => {
     ;(application.getPath as Mock).mockImplementation((key: string) => {
       if (key === 'feature.agents.data') return root
       if (key === 'feature.agents.system_workspaces') return workspacesRoot
+      if (key === 'feature.projects.data') return path.join(root, 'Projects')
       return `/mock/${key}`
     })
   })
@@ -150,6 +152,26 @@ describe('sweepAgentOrphans', () => {
 
     expect(removed).toEqual([])
     expect(existsSync(racing)).toBe(true)
+  })
+
+  it('keeps live project memory and fresh directories while reclaiming deleted projects', async () => {
+    const projectRoot = path.join(root, 'Projects')
+    const live = path.join(projectRoot, AGENT_LIVE)
+    const deleted = path.join(projectRoot, AGENT_GONE)
+    const fresh = path.join(projectRoot, AGENT_TRASHED)
+    for (const directory of [live, deleted, fresh]) mkdirSync(directory, { recursive: true })
+    dbh.db
+      .insert(agentWorkspaceTable)
+      .values({ id: 'project-workspace', name: 'Project', path: '/fixture/project', orderKey: 'a0' })
+      .run()
+    dbh.db.insert(agentProjectTable).values({ id: AGENT_LIVE, name: 'Live', workspaceId: 'project-workspace' }).run()
+    makeStale(live)
+    makeStale(deleted)
+    const result = await sweepAgentOrphans()
+    expect(result.removed).toContain(deleted)
+    expect(existsSync(deleted)).toBe(false)
+    expect(existsSync(live)).toBe(true)
+    expect(existsSync(fresh)).toBe(true)
   })
 
   it('keeps a warm session workspace dir whose agent_workspace row has not committed yet', async () => {

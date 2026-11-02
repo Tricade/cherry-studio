@@ -331,6 +331,7 @@ export const useSessions = (
           body: {
             agentId,
             name: form.name,
+            projectId: form.projectId,
             description: form.description,
             workspace: form.workspace
           }

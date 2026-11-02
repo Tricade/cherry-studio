@@ -278,7 +278,7 @@ const AgentChat = ({
     !runtime.hasOlder &&
     runtime.uiMessages.length === 0
   )
-  const canChangeWorkspace = Boolean(onSessionWorkspaceChange && isEmptyConversation)
+  const canChangeWorkspace = Boolean(onSessionWorkspaceChange && isEmptyConversation && !sessionSnapshot?.projectId)
   const runAfterFileNavigation = useCallback(
     (transition: () => void) => {
       if (requestFileNavigation) {
@@ -327,6 +327,7 @@ const AgentChat = ({
     const transition = () => {
       void onCreateEmptySession({
         agentId: sessionSnapshot.agentId,
+        projectId: sessionSnapshot.projectId,
         ...getNewSessionWorkspaceDefaults(sessionSnapshot)
       })
     }

@@ -9,6 +9,7 @@ import { useComposerKnowledgeBaseScope } from '../useComposerKnowledgeBaseScope'
 const kb = (id: string, name = id): KnowledgeBase => ({ id, name }) as KnowledgeBase
 
 interface HarnessProps {
+  strictBinding?: boolean
   configuredKnowledgeBaseIds?: readonly string[]
   allKnowledgeBases: KnowledgeBase[]
   isKnowledgeBasesLoading: boolean
@@ -23,6 +24,7 @@ function useScopeHarness(props: HarnessProps) {
   const [selectedKnowledgeBases, setSelectedKnowledgeBases] = useState<KnowledgeBase[]>(props.initialSelection ?? [])
   const scope = useComposerKnowledgeBaseScope({
     configuredKnowledgeBaseIds: props.configuredKnowledgeBaseIds,
+    strictBinding: props.strictBinding,
     allKnowledgeBases: props.allKnowledgeBases,
     isKnowledgeBasesLoading: props.isKnowledgeBasesLoading,
     scopeKey: props.scopeKey,
@@ -37,6 +39,36 @@ function useScopeHarness(props: HarnessProps) {
 const SCOPE_KEY = 'topic-1:agent-1'
 
 describe('useComposerKnowledgeBaseScope', () => {
+  it('prunes old selections and pasted markers when a project removes all shared knowledge', () => {
+    const bases = [kb('shared'), kb('private')]
+    const { result, rerender } = renderHook(useScopeHarness, {
+      initialProps: {
+        configuredKnowledgeBaseIds: ['shared'],
+        strictBinding: true,
+        allKnowledgeBases: bases,
+        isKnowledgeBasesLoading: false,
+        scopeKey: SCOPE_KEY,
+        initialSelection: [bases[0]],
+        remountsOnScopeChange: true
+      }
+    })
+    expect(result.current.selectableKnowledgeBases).toEqual([bases[0]])
+    rerender({
+      configuredKnowledgeBaseIds: [],
+      strictBinding: true,
+      allKnowledgeBases: bases,
+      isKnowledgeBasesLoading: false,
+      scopeKey: SCOPE_KEY,
+      initialSelection: [bases[0]],
+      remountsOnScopeChange: true
+    })
+    expect(result.current.selectableKnowledgeBases).toEqual([])
+    expect(result.current.selectedKnowledgeBasesInScope).toEqual([])
+    expect(result.current.resolveKnowledgeBaseMarker('private')).toBeNull()
+    act(() => result.current.restoreKnowledgeBaseSelection(['shared', 'private']))
+    expect(result.current.selectedKnowledgeBases).toEqual([])
+  })
+
   it('treats an empty configured knowledge-base list as all loaded bases selectable', () => {
     const bases = [kb('kb-1', 'Knowledge One'), kb('kb-2', 'Knowledge Two')]
 

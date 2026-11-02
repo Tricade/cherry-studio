@@ -36,6 +36,7 @@ const KnowledgeBaseComposerRuntime = ({ context }: { context: KnowledgeBaseToolC
     <KnowledgeBaseToolRuntime
       launcher={launcher}
       configuredKnowledgeBaseIds={context.assistant?.knowledgeBaseIds ?? context.session?.knowledgeBaseIds ?? []}
+      strictBinding={!!context.session?.projectId}
       selectedBases={state.selectedKnowledgeBases}
       onSelect={handleSelect}
       disabled={!isToolUseAvailable || (Array.isArray(state.files) && state.files.length > 0)}

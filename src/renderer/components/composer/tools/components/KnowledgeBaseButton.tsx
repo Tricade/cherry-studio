@@ -25,6 +25,7 @@ import type { KnowledgeBase } from '@shared/data/types/knowledge'
 interface Props {
   launcher: ToolLauncherApi
   configuredKnowledgeBaseIds?: readonly string[]
+  strictBinding?: boolean
   selectedBases?: KnowledgeBase[]
   onSelect: (bases: KnowledgeBase[]) => void
   disabled?: boolean
@@ -40,6 +41,7 @@ function getKnowledgeBaseIdsKey(ids: readonly string[] | undefined) {
 const useKnowledgeBaseToolController = ({
   launcher,
   configuredKnowledgeBaseIds,
+  strictBinding = false,
   selectedBases,
   onSelect,
   disabled,
@@ -67,9 +69,9 @@ const useKnowledgeBaseToolController = ({
     const configuredIds = new Set(
       configuredKnowledgeBaseIdsKey ? configuredKnowledgeBaseIdsKey.split(KNOWLEDGE_BASE_IDS_KEY_SEPARATOR) : []
     )
-    if (configuredIds.size === 0) return knowledgeBases
+    if (configuredIds.size === 0 && !strictBinding) return knowledgeBases
     return knowledgeBases.filter((base) => configuredIds.has(base.id))
-  }, [configuredKnowledgeBaseIdsKey, knowledgeBases])
+  }, [configuredKnowledgeBaseIdsKey, knowledgeBases, strictBinding])
   onSelectRef.current = onSelect
   selectedBasesRef.current = selectedBases ?? []
   configuredBasesRef.current = configuredBases

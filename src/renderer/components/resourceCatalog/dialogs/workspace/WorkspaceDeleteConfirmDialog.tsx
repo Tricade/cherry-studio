@@ -92,7 +92,8 @@ export function WorkspaceDeleteConfirmDialog({ workspace, onDeleted, onClose }: 
     swrOptions: { dedupingInterval: 0 }
   })
   const isPreviewPending = isReferencesLoading || isReferencesRefreshing
-  const canConfirm = references !== undefined && !isPreviewPending && !referencesError && !isPending
+  const hasProject = (references?.projects?.total ?? 0) > 0
+  const canConfirm = references !== undefined && !isPreviewPending && !referencesError && !isPending && !hasProject
 
   const handleConfirm = async () => {
     if (!canConfirm || isPendingRef.current) return
@@ -141,6 +142,11 @@ export function WorkspaceDeleteConfirmDialog({ workspace, onDeleted, onClose }: 
 
   const content = references ? (
     <div className="min-h-0 space-y-3 overflow-y-auto">
+      {hasProject ? (
+        <p role="alert" className="text-destructive text-sm">
+          {t('project.workspace_protected')}
+        </p>
+      ) : null}
       {isPreviewPending ? (
         <div className="flex items-center gap-2 text-muted-foreground text-xs">
           <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />

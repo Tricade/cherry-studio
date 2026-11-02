@@ -5,6 +5,7 @@ import { agentService } from '@data/services/AgentService'
 import { agentSessionMessageService } from '@data/services/AgentSessionMessageService'
 import { agentSessionService } from '@data/services/AgentSessionService'
 import { agentTaskService } from '@data/services/AgentTaskService'
+import { agentWorkspaceService } from '@data/services/AgentWorkspaceService'
 import { loggerService } from '@logger'
 import { BaseService, DependsOn, type Disposable, Injectable, Phase, ServicePhase } from '@main/core/lifecycle'
 import type { AgentSessionMessageEntity } from '@shared/data/api/schemas/agentSessionMessages'
@@ -507,6 +508,7 @@ export class AgentLifecycleService extends BaseService {
   }
 
   private async deleteWorkspaceInternal(workspaceId: string): Promise<{ deletedIds: string[] }> {
+    agentWorkspaceService.assertNoProjectReferencesTx(application.get('DbService').getDb(), workspaceId)
     return this.withStableSessions(
       () => agentSessionService.listIdsByWorkspace(workspaceId),
       async () => {

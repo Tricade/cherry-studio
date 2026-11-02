@@ -150,6 +150,7 @@ export type UseCacheSchema = {
   'ui.window.agent.session.expansion.time': string[]
   'ui.window.agent.session.expansion.agent': string[] | null
   'ui.window.agent.session.expansion.workdir': string[] | null
+  'ui.window.agent.session.expansion.project': string[] | null
 
   // Knowledge recall test query history (session-only)
   'knowledge.recall.search_queries': Record<string, string[]>
@@ -249,6 +250,7 @@ export const DefaultUseCache: UseCacheSchema = {
   'ui.window.agent.session.expansion.time': [],
   'ui.window.agent.session.expansion.agent': null,
   'ui.window.agent.session.expansion.workdir': null,
+  'ui.window.agent.session.expansion.project': null,
   'knowledge.recall.search_queries': {},
   'notes.active_file_path': undefined,
 
@@ -466,6 +468,7 @@ export type RendererPersistCacheSchema = {
   'ui.agent.session.expansion.time': string[]
   'ui.agent.session.expansion.agent': string[] | null
   'ui.agent.session.expansion.workdir': string[] | null
+  'ui.agent.session.expansion.project': string[] | null
   // Workspace paths whose file tree is unpinned in a wide Agent file pane; absent means pinned.
   'ui.agent.file_pane.unpinned_tree_workspaces': string[]
   // File tree column width in a wide Agent file pane, in pixels.
@@ -527,6 +530,7 @@ export const DefaultRendererPersistCache: RendererPersistCacheSchema = {
   'ui.agent.session.expansion.time': [],
   'ui.agent.session.expansion.agent': null,
   'ui.agent.session.expansion.workdir': null,
+  'ui.agent.session.expansion.project': null,
   'ui.agent.file_pane.unpinned_tree_workspaces': [],
   'ui.agent.file_pane.tree_width': 256,
   'settings.provider.last_selected_provider_id': null,

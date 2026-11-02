@@ -1,6 +1,16 @@
+import { setupTestDatabase } from '@test-helpers/db'
 import { MockMainPreferenceServiceUtils } from '@test-mocks/main/PreferenceService'
+import { eq } from 'drizzle-orm'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { agentTable } from '@data/db/schemas/agent'
+import {
+  agentProjectTable,
+  agentProjectMemberTable,
+  agentProjectKnowledgeBaseTable
+} from '@data/db/schemas/agentProject'
+import { agentWorkspaceTable } from '@data/db/schemas/agentWorkspace'
+import { knowledgeBaseTable } from '@data/db/schemas/knowledge'
 import type * as AgentApiGateway from '@main/ai/runtime/agentApiGateway'
 import type { AgentEntity } from '@shared/data/api/schemas/agents'
 import { CHERRY_CLOUD_MODEL_GROUP, CHERRY_CLOUD_PROVIDER_ID } from '@shared/data/presets/cherryai'
@@ -91,6 +101,57 @@ beforeEach(() => {
   mocks.getTurnTrustedNotifyChannels.mockReturnValue(undefined)
   mocks.usesPiGateway.mockReturnValue(false)
   mocks.gatewayFingerprint = 'gateway-1'
+})
+
+describe('project connection reconciliation', () => {
+  const dbh = setupTestDatabase()
+
+  it('refreshes changed project instructions and knowledge and refuses a removed team member', async () => {
+    dbh.db
+      .insert(agentTable)
+      .values({ id: agent.id, name: 'Coder', type: 'pi', instructions: '', orderKey: 'a0' })
+      .run()
+    dbh.db
+      .insert(agentWorkspaceTable)
+      .values({ id: 'workspace-1', name: 'Project folder', path: '/workspace', type: 'user', orderKey: 'a0' })
+      .run()
+    dbh.db
+      .insert(agentProjectTable)
+      .values({ id: 'project-1', name: 'Website', instructions: 'Original instructions', workspaceId: 'workspace-1' })
+      .run()
+    dbh.db.insert(agentProjectMemberTable).values({ projectId: 'project-1', agentId: agent.id }).run()
+    dbh.db
+      .insert(knowledgeBaseTable)
+      .values({
+        id: 'shared',
+        name: 'Team knowledge',
+        orderKey: 'a0',
+        status: 'completed',
+        chunkSize: 1024,
+        chunkOverlap: 200
+      })
+      .run()
+    mocks.getSession.mockReturnValue({ ...mocks.getSession(), projectId: 'project-1' })
+    const initial = await capturePiConnectionSnapshot('session-1', agent.id)
+    expect(initial.project).toMatchObject({ instructions: 'Original instructions', knowledgeBaseIds: [] })
+
+    dbh.db
+      .update(agentProjectTable)
+      .set({ instructions: 'Updated instructions' })
+      .where(eq(agentProjectTable.id, 'project-1'))
+      .run()
+    const updated = await capturePiConnectionSnapshot('session-1', agent.id)
+    expect(updated.project?.instructions).toBe('Updated instructions')
+    expect(updated.signature).not.toBe(initial.signature)
+
+    dbh.db.insert(agentProjectKnowledgeBaseTable).values({ projectId: 'project-1', knowledgeBaseId: 'shared' }).run()
+    const shared = await capturePiConnectionSnapshot('session-1', agent.id)
+    expect(shared.project?.knowledgeBaseIds).toEqual(['shared'])
+    expect(shared.signature).not.toBe(updated.signature)
+
+    dbh.db.delete(agentProjectMemberTable).where(eq(agentProjectMemberTable.projectId, 'project-1')).run()
+    await expect(capturePiConnectionSnapshot('session-1', agent.id)).rejects.toThrow(/belong to this project/)
+  })
 })
 
 describe('capturePiConnectionSnapshot', () => {

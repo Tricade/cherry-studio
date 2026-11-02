@@ -75,6 +75,42 @@ function createSession(overrides: Partial<AgentSessionEntity & { pinned: boolean
 }
 
 describe('SessionList helpers', () => {
+  it('groups different agents by project and keeps unassigned and pinned conversations distinct', () => {
+    const projects = [
+      { id: 'site', name: 'Website' },
+      { id: 'app', name: 'Application' }
+    ]
+    const sessions = [
+      createSession({ id: 'app-chat', projectId: 'app' }),
+      createSession({ id: 'planning', projectId: 'site', agentId: 'planner' }),
+      createSession({ id: 'coding', projectId: 'site', agentId: 'coder' }),
+      createSession({ id: 'unassigned' }),
+      createSession({ id: 'pin', projectId: 'site', pinned: true })
+    ]
+    const view = deriveSessionListView(sessions, {
+      mode: 'project',
+      projects,
+      labels: { ...SESSION_GROUP_LABELS, noProject: 'Without a project' },
+      agentById: new Map(),
+      agentRankById: new Map(),
+      now: new Date(),
+      visibleAgentId: undefined,
+      workspaces: []
+    })
+    expect(view.items.map(({ id }) => id)).toEqual(['pin', 'planning', 'coding', 'app-chat', 'unassigned'])
+    expect(view.groupBy(sessions[1])).toEqual({ id: 'session:project:site', label: 'Website' })
+    expect(view.groupBy(sessions[2])).toEqual({ id: 'session:project:site', label: 'Website' })
+    expect(view.groupBy(sessions[3])).toEqual({ id: 'session:project:none', label: 'Without a project' })
+    expect(view.groupBy(sessions[4])?.id).toBe(SESSION_PINNED_GROUP_ID)
+    expect(
+      canDropSessionItemInDisplayGroup({
+        mode: 'project',
+        sourceGroupId: 'session:project:site',
+        targetGroupId: 'session:project:site'
+      })
+    ).toBe(false)
+  })
+
   it('builds normal ascending order anchors for session drops', () => {
     const payload = createResourceListItemReorderPayload({
       sourceGroupId: 'session:workdir:%2FUsers%2Fjd%2Fproject-a',

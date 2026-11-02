@@ -17,6 +17,7 @@ interface AgentSidePanelProps {
   onAddAgent?: () => void | Promise<void>
   onOpenHistoryRecords?: () => void
   onManageAgents?: () => void | Promise<void>
+  onManageProjects?: (projectId?: string) => void
   onSetPanePosition?: (position: TopicTabPosition) => void | Promise<void>
   onCreateSession?: (
     defaults: CreateAgentSessionDefaults
@@ -37,6 +38,7 @@ const AgentSidePanel = ({
   onAddAgent,
   onOpenHistoryRecords,
   onManageAgents,
+  onManageProjects,
   onSetPanePosition,
   onCreateSession,
   onShowMissingAgentSelection,
@@ -57,6 +59,7 @@ const AgentSidePanel = ({
         onAddAgent={onAddAgent}
         onOpenHistoryRecords={onOpenHistoryRecords}
         onManageAgents={onManageAgents}
+        onManageProjects={onManageProjects}
         onSetPanePosition={onSetPanePosition}
         panePosition={panePosition}
         revealRequest={revealRequest}

@@ -1,4 +1,4 @@
-import { Folder, FolderOpen, MoreHorizontal, Plus } from 'lucide-react'
+import { Folder, FolderKanban, FolderOpen, MoreHorizontal, Plus } from 'lucide-react'
 import { lazy, memo, type RefObject, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -76,12 +76,14 @@ import {
   deriveSessionListView,
   getAgentIdFromSessionGroupId,
   getSessionAgentGroupId,
+  getSessionProjectGroupId,
   getWorkdirPathFromSessionGroupId,
   isSystemWorkspaceSession,
   moveSessionAgentGroupAfterDrop,
   moveSessionWorkdirGroupAfterDrop,
   normalizeSessionDropPayload,
   SESSION_AGENT_SECTION_ID,
+  SESSION_PROJECT_SECTION_ID,
   SESSION_NO_PROJECT_GROUP_ID,
   SESSION_NO_PROJECT_SECTION_ID,
   SESSION_NO_WORKDIR_GROUP_ID,
@@ -102,6 +104,7 @@ import {
 } from '@renderer/utils/sidebar'
 import { isProtectedBuiltinAgentRole } from '@shared/ai/builtinAgent'
 import type { OrderRequest } from '@shared/data/api/schemas/_endpointHelpers'
+import type { AgentProjectEntity } from '@shared/data/api/schemas/agentProjects'
 import type { AgentSessionEntity } from '@shared/data/api/schemas/agentSessions'
 import {
   AGENT_WORKSPACE_TYPE,
@@ -139,6 +142,7 @@ type SessionsBaseProps = {
   onAddAgent?: () => void | Promise<void>
   onOpenHistoryRecords?: () => void
   onManageAgents?: () => void | Promise<void>
+  onManageProjects?: (projectId?: string) => void
   onSetPanePosition?: (position: TopicTabPosition) => void | Promise<void>
   onCreateSession?: (
     defaults: CreateAgentSessionDefaults
@@ -159,12 +163,14 @@ type SessionsProps = ControlledSessionsProps
 const logger = loggerService.withContext('AgentSessions')
 
 const EMPTY_WORKSPACE_ROWS: AgentWorkspaceEntity[] = []
+const EMPTY_PROJECT_ROWS: AgentProjectEntity[] = []
 // Let the context menu close before mounting the heavier offscreen message list.
 const IMAGE_CAPTURE_START_DELAY_MS = 160
 const DEFAULT_SESSION_GROUP_VISIBLE_COUNT = 5
 const LEFT_PANEL_TIME_SESSION_GROUP_VISIBLE_COUNT = 50
 
 type CreateSessionSeed = {
+  projectId?: string
   agentId?: string | null
   workspace?: AgentSessionWorkspaceSource
   workspacePath?: string
@@ -285,7 +291,7 @@ function WorkdirGroupMoreMenu({
 }
 
 export function buildCreateSessionSeed(
-  session: Pick<AgentSessionEntity, 'agentId' | 'workspaceId' | 'workspace'> | null | undefined
+  session: Pick<AgentSessionEntity, 'agentId' | 'workspaceId' | 'workspace' | 'projectId'> | null | undefined
 ): CreateSessionSeed | null {
   if (!session?.agentId) return null
 
@@ -296,6 +302,7 @@ export function buildCreateSessionSeed(
   if (session.workspaceId) {
     return {
       agentId: session.agentId,
+      ...(session.projectId ? { projectId: session.projectId } : {}),
       workspace: { type: AGENT_WORKSPACE_TYPE.USER, workspaceId: session.workspaceId }
     }
   }
@@ -364,6 +371,7 @@ const Sessions = ({
   onAddAgent,
   onOpenHistoryRecords,
   onManageAgents,
+  onManageProjects,
   onSetPanePosition,
   onCreateSession,
   onShowMissingAgentSelection,
@@ -400,6 +408,10 @@ const Sessions = ({
   const [sessionExpansionWorkdir, setSessionExpansionWorkdir] = useWindowScopedPersistCache(
     'ui.agent.session.expansion.workdir',
     'ui.window.agent.session.expansion.workdir'
+  )
+  const [sessionExpansionProject, setSessionExpansionProject] = useWindowScopedPersistCache(
+    'ui.agent.session.expansion.project',
+    'ui.window.agent.session.expansion.project'
   )
   const {
     sessions,
@@ -453,14 +465,14 @@ const Sessions = ({
 
   const displayMode: AgentSessionDisplayMode = isRightPanel
     ? 'time'
-    : sessionDisplayMode === 'workdir' || sessionDisplayMode === 'agent'
+    : sessionDisplayMode === 'workdir' || sessionDisplayMode === 'agent' || sessionDisplayMode === 'project'
       ? sessionDisplayMode
       : 'time'
   const defaultGroupVisibleCount =
     !isRightPanel && displayMode === 'time'
       ? LEFT_PANEL_TIME_SESSION_GROUP_VISIBLE_COUNT
       : DEFAULT_SESSION_GROUP_VISIBLE_COUNT
-  const isDraggableMode = displayMode !== 'time'
+  const isDraggableMode = displayMode === 'agent' || displayMode === 'workdir'
   const [rightPanelSessionExpansion, setRightPanelSessionExpansion] = useState<string[]>([])
   const sessionExpansion = isRightPanel
     ? rightPanelSessionExpansion
@@ -468,7 +480,9 @@ const Sessions = ({
       ? sessionExpansionAgent
       : displayMode === 'workdir'
         ? sessionExpansionWorkdir
-        : sessionExpansionTime
+        : displayMode === 'project'
+          ? sessionExpansionProject
+          : sessionExpansionTime
 
   // Ref-guarded against <Activity> re-show: hide/show re-runs this effect with
   // an unchanged filter, and the fresh [] would wipe the user's expansion state
@@ -611,6 +625,14 @@ const Sessions = ({
   } = useQuery('/agent-workspaces', { enabled: displayMode === 'workdir' })
   useDataChange(displayMode === 'workdir' ? '/agent-workspaces' : [], () => void refetchWorkspaces())
   const workspaceRows = workspaces ?? EMPTY_WORKSPACE_ROWS
+  const {
+    data: projects,
+    error: projectsError,
+    isLoading: projectsLoading,
+    refetch: refetchProjects
+  } = useQuery('/agent-projects', { enabled: dataEnabled && displayMode === 'project' })
+  useDataChange(dataEnabled && displayMode === 'project' ? '/agent-projects' : [], () => void refetchProjects())
+  const projectRows = projects ?? EMPTY_PROJECT_ROWS
   const isWorkdirMetadataLoading = displayMode === 'workdir' && isWorkspacesLoading
   const isWorkdirMetadataRefreshing = displayMode === 'workdir' && isWorkspacesRefreshing
   const workdirDragReady =
@@ -636,6 +658,7 @@ const Sessions = ({
       agentById,
       agentRankById,
       labels: {
+        noProject: t('project.unassigned'),
         pinned: t('selector.common.pinned_title'),
         time: {
           today: t('agent.session.group.today'),
@@ -653,9 +676,20 @@ const Sessions = ({
       mode: displayMode,
       now: groupNow,
       visibleAgentId: isRightPanel ? (agentIdFilter ?? null) : undefined,
-      workspaces: workspaceRowsForDisplay
+      workspaces: workspaceRowsForDisplay,
+      projects: projectRows
     }),
-    [agentById, agentIdFilter, agentRankById, displayMode, groupNow, isRightPanel, t, workspaceRowsForDisplay]
+    [
+      agentById,
+      agentIdFilter,
+      agentRankById,
+      displayMode,
+      groupNow,
+      isRightPanel,
+      t,
+      workspaceRowsForDisplay,
+      projectRows
+    ]
   )
 
   const {
@@ -724,13 +758,22 @@ const Sessions = ({
       }
 
       return {
-        id: displayMode === 'agent' ? SESSION_AGENT_SECTION_ID : SESSION_WORKDIR_SECTION_ID,
+        id:
+          displayMode === 'agent'
+            ? SESSION_AGENT_SECTION_ID
+            : displayMode === 'project'
+              ? SESSION_PROJECT_SECTION_ID
+              : SESSION_WORKDIR_SECTION_ID,
         label: t(SESSION_DISPLAY_LABEL_KEYS[displayMode])
       }
     }
   }, [displayMode, t])
 
   const sessionGroupSeeds = useMemo<ResourceListGroupSeed[]>(() => {
+    if (displayMode === 'project') {
+      const section = { id: SESSION_PROJECT_SECTION_ID, label: t('project.title') }
+      return projectRows.map((project) => ({ id: getSessionProjectGroupId(project.id), label: project.name, section }))
+    }
     if (displayMode === 'agent') {
       const section = { id: SESSION_AGENT_SECTION_ID, label: t(SESSION_DISPLAY_LABEL_KEYS.agent) }
       return agentsForDisplay.map((agent) => ({ id: getSessionAgentGroupId(agent.id), label: agent.name, section }))
@@ -757,7 +800,7 @@ const Sessions = ({
     }
 
     return []
-  }, [agentsForDisplay, displayMode, filteredGroupedSessions, t, workdirDisplay, workspaceRowsForDisplay])
+  }, [agentsForDisplay, displayMode, filteredGroupedSessions, t, workdirDisplay, workspaceRowsForDisplay, projectRows])
 
   const collapsedSessionState = useMemo(() => {
     const resolvedSessionExpansion = resolveDefaultCollapsedGroupIds({
@@ -785,9 +828,17 @@ const Sessions = ({
 
       if (displayMode === 'agent') setSessionExpansionAgent(nextCollapsedIds)
       else if (displayMode === 'workdir') setSessionExpansionWorkdir(nextCollapsedIds)
+      else if (displayMode === 'project') setSessionExpansionProject(nextCollapsedIds)
       else setSessionExpansionTime(nextCollapsedIds)
     },
-    [displayMode, isRightPanel, setSessionExpansionAgent, setSessionExpansionTime, setSessionExpansionWorkdir]
+    [
+      displayMode,
+      isRightPanel,
+      setSessionExpansionAgent,
+      setSessionExpansionTime,
+      setSessionExpansionWorkdir,
+      setSessionExpansionProject
+    ]
   )
 
   const handleDeleteSession = useCallback(
@@ -1151,6 +1202,7 @@ const Sessions = ({
 
         const createdSession = await onCreateSession({
           agentId,
+          ...(seed?.projectId ? { projectId: seed.projectId } : {}),
           workspace
         })
 
@@ -1201,10 +1253,11 @@ const Sessions = ({
 
   const handleRetry = useCallback(async () => {
     await reload()
+    if (displayMode === 'project') await refetchProjects()
     if (displayMode === 'workdir') {
       await refetchWorkspaces()
     }
-  }, [displayMode, refetchWorkspaces, reload])
+  }, [displayMode, refetchWorkspaces, refetchProjects, reload])
 
   const refreshAgentResources = useCallback(async () => {
     const outcomes = await Promise.allSettled([refetchAgents(), reload()])
@@ -1543,6 +1596,7 @@ const Sessions = ({
 
   const canDragSessionGroup = useCallback(
     (group: ResourceListGroup) => {
+      if (displayMode === 'project') return false
       if (displayMode === 'agent') {
         const agentId = getAgentIdFromSessionGroupId(group.id)
         return agentDragReady && !!agentId && agentById.has(agentId)
@@ -1555,6 +1609,7 @@ const Sessions = ({
 
   const canDropSessionGroup = useCallback(
     ({ activeGroupId, overGroupId }: { activeGroupId: string; overGroupId: string }) => {
+      if (displayMode === 'project') return false
       if (displayMode === 'agent') {
         const activeAgentId = getAgentIdFromSessionGroupId(activeGroupId)
         const overAgentId = getAgentIdFromSessionGroupId(overGroupId)
@@ -1606,6 +1661,7 @@ const Sessions = ({
 
   const handleSessionReorder = useCallback(
     async (payload: ResourceListReorderPayload) => {
+      if (displayMode === 'project') return
       if (payload.type === 'group') {
         if (displayMode === 'agent') {
           if (!agentDragReady) return
@@ -1746,6 +1802,20 @@ const Sessions = ({
     (group: ResourceListGroup) => {
       if (group.id === SESSION_PINNED_GROUP_ID) return null
       if (displayMode === 'time') return null
+      if (displayMode === 'project') {
+        const project = projectRows.find((item) => getSessionProjectGroupId(item.id) === group.id)
+        return project && onManageProjects ? (
+          <ResourceList.GroupHeaderActionButton
+            type="button"
+            aria-label={t('project.open', { name: project.name })}
+            onClick={(event) => {
+              event.stopPropagation()
+              onManageProjects(project.id)
+            }}>
+            <Plus />
+          </ResourceList.GroupHeaderActionButton>
+        ) : null
+      }
 
       const agentGroupId = displayMode === 'agent' ? getAgentIdFromSessionGroupId(group.id) : undefined
       const workspaceId = displayMode === 'workdir' ? workdirDisplay.workspaceIdByGroupId.get(group.id) : undefined
@@ -1849,6 +1919,8 @@ const Sessions = ({
       onCreateSession,
       onShowMissingAgentSelection,
       requestCreateSessionFromSeed,
+      onManageProjects,
+      projectRows,
       setAssistantIconType,
       sidebarAgentFavoriteIdSet,
       t,
@@ -2058,10 +2130,20 @@ const Sessions = ({
   )
 
   const listError =
-    error ?? (displayMode === 'agent' ? agentsError : displayMode === 'workdir' ? workspacesError : undefined)
+    error ??
+    (displayMode === 'agent'
+      ? agentsError
+      : displayMode === 'workdir'
+        ? workspacesError
+        : displayMode === 'project'
+          ? projectsError
+          : undefined)
   const historyLoading = isLoadingAll || !isFullyLoaded
   const metadataLoading =
-    isSessionPinsLoading || isWorkdirMetadataLoading || (displayMode === 'agent' && isAgentsLoading)
+    isSessionPinsLoading ||
+    isWorkdirMetadataLoading ||
+    (displayMode === 'agent' && isAgentsLoading) ||
+    (displayMode === 'project' && projectsLoading)
   const listLoading = historyLoading || metadataLoading
   const listValidating = isValidating || isWorkdirMetadataRefreshing
   const visibleGroupedSessions = useMemo(
@@ -2076,10 +2158,24 @@ const Sessions = ({
         ? 'empty'
         : 'idle'
   const hasActiveCenterSurface = manageAgentsActive || historyRecordsActive
-  const headerCreateLabel = displayMode === 'agent' ? t('agent.add.title') : t('agent.session.new')
+  const headerCreateLabel =
+    displayMode === 'agent'
+      ? t('agent.add.title')
+      : displayMode === 'project'
+        ? t('project.new')
+        : t('agent.session.new')
   const headerCreateDisabled =
-    displayMode === 'agent' ? !onAddAgent : creatingSession || (!onCreateSession && !onShowMissingAgentSelection)
-  const handleHeaderCreate = displayMode === 'agent' ? () => void onAddAgent?.() : handleHeaderCreateSession
+    displayMode === 'agent'
+      ? !onAddAgent
+      : displayMode === 'project'
+        ? !onManageProjects
+        : creatingSession || (!onCreateSession && !onShowMissingAgentSelection)
+  const handleHeaderCreate =
+    displayMode === 'agent'
+      ? () => void onAddAgent?.()
+      : displayMode === 'project'
+        ? () => onManageProjects?.()
+        : handleHeaderCreateSession
   const canSetPanePosition = displayMode === 'agent' || isRightPanel
 
   return (
@@ -2134,7 +2230,15 @@ const Sessions = ({
               command={displayMode === 'agent' ? undefined : 'topic.create'}
               aria-label={headerCreateLabel}
               disabled={headerCreateDisabled}
-              icon={displayMode === 'agent' ? <Plus /> : <NewConversationIcon />}
+              icon={
+                displayMode === 'agent' ? (
+                  <Plus />
+                ) : displayMode === 'project' ? (
+                  <FolderKanban />
+                ) : (
+                  <NewConversationIcon />
+                )
+              }
               label={headerCreateLabel}
               onClick={handleHeaderCreate}
               actions={
@@ -2144,13 +2248,16 @@ const Sessions = ({
                   mode={displayMode}
                   onChange={(nextMode) => void setSessionDisplayMode(nextMode)}
                   onManageAgents={onManageAgents}
+                  onManageProjects={onManageProjects}
                   onOpenHistoryRecords={onOpenHistoryRecords}
                   sectionIds={
                     displayMode === 'agent'
                       ? [SESSION_AGENT_SECTION_ID]
-                      : displayMode === 'workdir'
-                        ? [SESSION_WORKDIR_SECTION_ID]
-                        : undefined
+                      : displayMode === 'project'
+                        ? [SESSION_PROJECT_SECTION_ID]
+                        : displayMode === 'workdir'
+                          ? [SESSION_WORKDIR_SECTION_ID]
+                          : undefined
                   }
                 />
               }

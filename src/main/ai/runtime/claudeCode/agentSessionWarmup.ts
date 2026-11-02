@@ -18,8 +18,12 @@ import {
   resolveAgentNotificationContext,
   resolveLinkedNotifyChannel
 } from '@main/ai/runtime/agentMcpServers'
+import {
+  type AgentProjectContext,
+  getAgentProjectContext,
+  resolveAgentProjectKnowledgeScope
+} from '@main/ai/runtime/agentProjectContext'
 import { getEffectiveAgentLanguage } from '@main/ai/utils/agentLanguage'
-import { resolveKnowledgeBaseScope } from '@main/ai/utils/knowledgeScope'
 import { encodeReasoningInvocation, resolveReasoningInvocation } from '@main/ai/utils/reasoningSerializers'
 import { createAiUsageCaptureContext } from '@main/ai/utils/usageCapture'
 import {
@@ -137,6 +141,7 @@ function gatewayBypassRule(route: Pick<ClaudeCodeRouteFacts, 'branch' | 'baseUrl
 }
 
 interface ConnectionMaterializationFacts {
+  project?: AgentProjectContext | null
   route: ClaudeCodeRouteFacts
   mcp: unknown[]
   skills: string[]
@@ -376,6 +381,7 @@ async function deriveConnectionConfigFromSnapshot(
   selectedKnowledgeBaseIds: readonly string[] = [],
   materialized?: ConnectionMaterializationFacts
 ): Promise<ConnectionConfig> {
+  const project = materialized ? (materialized.project ?? undefined) : getAgentProjectContext(session, agent.id)
   const cwd = session.workspace?.path
   if (!cwd) throw new Error(`Agent session ${session.id} has no workspace path`)
   const { providerId, modelId } = parseUniqueModelId(uniqueModelId)
@@ -403,6 +409,7 @@ async function deriveConnectionConfigFromSnapshot(
   const proxyEnvironmentFingerprint =
     materialized?.proxyEnvironmentFingerprint ?? (await deriveAgentProxyEnvironmentFingerprint(agent, routeFacts))
   const rebuildFacts = {
+    project,
     modelId: uniqueModelId,
     contextWindow,
     maxOutputTokens,
@@ -431,7 +438,7 @@ async function deriveConnectionConfigFromSnapshot(
       .sort(([a], [b]) => a.localeCompare(b)),
     proxyEnvironment: proxyEnvironmentFingerprint,
     disabledTools: [...(agent.disabledTools ?? [])].sort(),
-    knowledgeBaseIds: resolveKnowledgeBaseScope(agent.knowledgeBaseIds, selectedKnowledgeBaseIds),
+    knowledgeBaseIds: resolveAgentProjectKnowledgeScope(project, agent.knowledgeBaseIds, selectedKnowledgeBaseIds),
     mcp: materialized?.mcp ?? deriveMcpDefinitionFacts(agent.mcps),
     notificationContext
   }
@@ -504,6 +511,7 @@ export async function buildClaudeCodeQueryRequestForAgentSession(
 
   const agent = agentService.getAgent(session.agentId)
   if (!agent?.model) return undefined
+  const project = getAgentProjectContext(session, agent.id)
   const linkedChannelSnapshot = resolveLinkedNotifyChannel(session.id, agent.id)
   const notificationContext = resolveAgentNotificationContext(session.id, agent.id, linkedChannelSnapshot)
   const mcpServerSnapshots = captureMcpServerSnapshots(agent.mcps)
@@ -555,6 +563,7 @@ export async function buildClaudeCodeQueryRequestForAgentSession(
       {
         contextWindow,
         maxOutputTokens,
+        project: project ?? null,
         lastAgentSessionId: resumeSessionId,
         mcpServerSnapshots,
         linkedChannelSnapshot,
@@ -582,6 +591,7 @@ export async function buildClaudeCodeQueryRequestForAgentSession(
     selectedKnowledgeBaseIds,
     {
       route: toConnectionRouteFacts(route),
+      project: project ?? null,
       mcp: deriveMcpDefinitionFacts(agent.mcps, mcpServerSnapshots),
       skills: settings.skills ?? [],
       notificationContext,
@@ -611,7 +621,7 @@ export async function buildClaudeCodeQueryRequestForAgentSession(
     initializeTimeoutMs: settings.warmQueryInitializeTimeoutMs,
     notificationContext,
     credentialsFingerprint: route.credentialsFingerprint,
-    knowledgeBaseIds: resolveKnowledgeBaseScope(agent.knowledgeBaseIds, selectedKnowledgeBaseIds),
+    knowledgeBaseIds: resolveAgentProjectKnowledgeScope(project, agent.knowledgeBaseIds, selectedKnowledgeBaseIds),
     settings,
     sdkModelId,
     usageCapture: route.usageCapture
