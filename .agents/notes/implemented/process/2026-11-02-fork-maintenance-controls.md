@@ -1,0 +1,34 @@
+# Agent Note: Fork maintenance controls
+
+Status: implemented
+
+English | [中文](2026-11-02-fork-maintenance-controls.zh.md)
+
+## Problem
+
+The Tricade fork has no protection for `main`. Its inherited Dependabot configuration checks only GitHub Actions, while vulnerability alerts and security updates are disabled. The pnpm workspace contains version-specific patches that need individual compatibility review.
+
+## Decision
+
+Require pull requests, signed commits and resolved conversations on `main`, including for administrators. Reject force pushes and deletion. Require no outside approval because the fork has a single maintainer; use only CI contexts actually emitted by this fork. The owner explicitly authorized these fork-local controls in the task conversation.
+
+Check npm workspace dependencies and GitHub Actions weekly, with bounded open pull requests. Group ordinary minor and patch updates, leaving patched packages and Electron in individual pull requests. Do not ignore their updates or enable automatic merging. Keep `pnpm-workspace.yaml` patches and overrides authoritative.
+
+Enable vulnerability alerts and Dependabot security updates. GitHub's current [pnpm support documentation](https://docs.github.com/en/code-security/reference/supply-chain-security/supported-ecosystems-and-repositories#pnpm) states that version updates support pnpm 12, but its two-document lockfile is not recognized by the dependency graph. This repository pins pnpm 12.6.0 and uses that format. Enabled settings therefore do not establish alert or security-fix coverage for its lockfile dependencies; preserve the working lockfile and disclose the gap.
+
+## Alternatives considered
+
+Requiring another maintainer's approval would prevent a solo owner from merging their own work. Requiring guessed CI names would leave every PR blocked. Ignoring patched packages would conceal available updates; grouping them into routine updates would hide their patch-rebase work. Changing the lockfile format solely to accommodate GitHub would change a working package-manager contract outside this task.
+
+## Consequences
+
+Dependabot may need manual help rebasing version-specific patches. Required checks must be updated if CI job names change. Upstream synchronization now needs a pull request. Security warnings for the two-document pnpm lockfile remain limited until GitHub supports it or a separately verified dependency submission path is introduced.
+
+
+## Verification
+
+- Regression — GitHub REST API 2026-03-10 readback confirms PR requirements, admin enforcement, required signatures, resolved conversations, disabled force pushes/deletion, vulnerability alerts (HTTP 204) and enabled security updates. No outside approval is required.
+- Regression — Configuration inspection against pnpm-workspace.yaml confirms all 38 patched packages and Electron are excluded from the ordinary minor/patch group, not ignored. Weekly schedules cap version PRs at five for npm and three for GitHub Actions.
+- Regression — Pinned pnpm 12.6.0 frozen-lockfile installation, YAML parsing, scoped formatting, documentation checks and diff whitespace checks passed. The affected-check planner was inspected; its full-suite fallback was not run locally for this configuration change.
+
+GitHub scheduling and the dependency graph remain service behavior. Neither YAML checks nor enabled security settings prove complete vulnerability coverage; the documented pnpm 12 limitation still applies.

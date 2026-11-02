@@ -1,17 +1,79 @@
 version: 2
 updates:
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: npm
+    directory: /
     schedule:
-      interval: "monthly"
+      interval: weekly
+      day: monday
+      time: 09:00
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      npm-minor-patch:
+        patterns:
+          - "*"
+        # Patched packages need individual patch/override review; updates remain enabled.
+        exclude-patterns:
+          - "@ai-sdk/amazon-bedrock"
+          - "@ai-sdk/anthropic"
+          - "@ai-sdk/google"
+          - "@ai-sdk/open-responses"
+          - "@ai-sdk/openai"
+          - "@ai-sdk/openai-compatible"
+          - "@ai-sdk/react"
+          - "@aiden0z/pptx-renderer"
+          - "@earendil-works/pi-agent-core"
+          - "@earendil-works/pi-ai"
+          - "@earendil-works/pi-coding-agent"
+          - "@elysia/node"
+          - "@napi-rs/system-ocr"
+          - "@openrouter/ai-sdk-provider"
+          - "@opeoginni/github-copilot-openai-compatible"
+          - "@pierre/diffs"
+          - "@sting8k/pi-vcc"
+          - "@tiptap/extension-drag-handle"
+          - "@tiptap/extension-list"
+          - "@tiptap/markdown"
+          - ai
+          - app-builder-lib
+          - atomically
+          - bonjour-service
+          - dingtalk-stream
+          - docx-preview
+          - electron
+          - electron-updater
+          - emoji-picker-react
+          - file-stream-rotator
+          - motion-dom
+          - ollama-ai-provider-v2
+          - onnxruntime-node
+          - ppu-paddle-ocr
+          - rtf.js
+          - sherpa-onnx-node
+          - streamdown
+          - tesseract.js
+          - vfile-location
+        update-types:
+          - minor
+          - patch
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: 09:00
+      timezone: Europe/Berlin
     open-pull-requests-limit: 3
     commit-message:
-      prefix: "ci"
-      include: "scope"
+      prefix: ci
+      include: scope
     groups:
       github-actions:
         patterns:
           - "*"
         update-types:
-          - "minor"
-          - "patch"
+          - minor
+          - patch
