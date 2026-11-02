@@ -18,6 +18,8 @@ Tricade 分叉仓库尚未保护 `main`。继承的 Dependabot 配置只检查 G
 
 通过 `branches: ["**"]` 在所有分支推送时运行现有 CI 工作流，同时保留 PR 触发器、任务、权限和受影响检查规划器。虽然 Actions 已启用且触发器匹配，两个分别创建、已就绪的 PR 均未产生 PR 工作流运行。根据 GitHub 当前的[事件资格规则](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#checks-from-some-workflow-jobs-are-not-evaluated)，成功的手动基线运行不能满足 PR 必需检查，而 `push` 可以。这样可为功能、安全、Dependabot 和上游同步分支提供常规事件路径。[仅分支过滤器](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onpushbranchestagsbranches-ignoretags-ignore)排除标签。PR 事件缺失的原因尚未确定。
 
+macOS 平台任务使用标准 `macos-26-intel` runner。连续两次完整 CI 运行均未能获得 `macos-latest` runner；GitHub 明确标注 macOS arm64 容量不足，两个任务都在执行任何步骤前结束。2026-11-02 的[官方 runner 表](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)将 `macos-latest` 映射为 macOS 26 arm64，并将 `macos-26-intel` 列为标准 macOS 26 x64 runner。这样保留相同的操作系统主版本，并保持 `pnpm check --group platform` 的选择规则不变。所选原生冒烟测试接受两种 Darwin 架构。Intel 执行不能证明 Apple Silicon 二进制文件或 ABI 的兼容性；这仍需单独的发布验证。不得将 runner 不可用视为检查成功，也不得屏蔽平台门禁。
+
 ## 考虑过的替代方案
 
 要求另一位维护者批准会阻止单人维护者合并自己的工作。要求未经确认的 CI 检查名称会阻塞所有拉取请求。忽略带补丁的包会隐藏可用更新；将其并入普通更新组则会掩盖补丁调整工作。仅为了适配 GitHub 而更改锁文件格式，会改变本任务范围之外、已经正常工作的包管理器约定。关闭必需检查或用手动触发代替合格事件，会破坏预期的合并门禁。

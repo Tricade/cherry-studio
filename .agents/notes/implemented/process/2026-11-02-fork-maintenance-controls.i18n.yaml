@@ -1,5 +1,5 @@
 # Bilingual-pair consistency record (docs/dev/i18n/README.md).
 # After editing either side, update its counterpart and re-record with:
 #   pnpm docs:check-pairing --write .agents/notes/implemented/process/2026-11-02-fork-maintenance-controls.md
-2026-11-02-fork-maintenance-controls.md: 74ae71db55cd76bb3031d429e6da66b3fbbc7a35
-2026-11-02-fork-maintenance-controls.zh.md: 259b0fbb8821d0adf0759633ac9d2f729878dc33
+2026-11-02-fork-maintenance-controls.md: bf791330e23461c8bb92a8aff35282b82acf96fa
+2026-11-02-fork-maintenance-controls.zh.md: d45269e90bfb77c874580bdb0b5a9b2f6f8ed36f
