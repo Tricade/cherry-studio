@@ -16,19 +16,21 @@ Check npm workspace dependencies and GitHub Actions weekly, with bounded open pu
 
 Enable vulnerability alerts and Dependabot security updates. GitHub's current [pnpm support documentation](https://docs.github.com/en/code-security/reference/supply-chain-security/supported-ecosystems-and-repositories#pnpm) states that version updates support pnpm 12, but its two-document lockfile is not recognized by the dependency graph. This repository pins pnpm 12.6.0 and uses that format. Enabled settings therefore do not establish alert or security-fix coverage for its lockfile dependencies; preserve the working lockfile and disclose the gap.
 
+Run the existing CI workflow on pushes to every branch using `branches: ["**"]`, while retaining its PR triggers, jobs, permissions and affected-check planner. The fork emitted no PR workflow runs for two independently opened, ready PRs despite active Actions settings and matching triggers. A successful manual baseline run does not satisfy required PR checks under GitHub's current [event eligibility rules](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#checks-from-some-workflow-jobs-are-not-evaluated); `push` is eligible. This supplies a regular event path for feature, security, Dependabot and upstream-sync branches. The [branch-only filter](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onpushbranchestagsbranches-ignoretags-ignore) excludes tags. The cause of the missing PR events remains undetermined.
+
 ## Alternatives considered
 
-Requiring another maintainer's approval would prevent a solo owner from merging their own work. Requiring guessed CI names would leave every PR blocked. Ignoring patched packages would conceal available updates; grouping them into routine updates would hide their patch-rebase work. Changing the lockfile format solely to accommodate GitHub would change a working package-manager contract outside this task.
+Requiring another maintainer's approval would prevent a solo owner from merging their own work. Requiring guessed CI names would leave every PR blocked. Ignoring patched packages would conceal available updates; grouping them into routine updates would hide their patch-rebase work. Changing the lockfile format solely to accommodate GitHub would change a working package-manager contract outside this task. Disabling required checks or substituting a manual dispatch for an eligible event would defeat the intended merge gate.
 
 ## Consequences
 
-Dependabot may need manual help rebasing version-specific patches. Required checks must be updated if CI job names change. Upstream synchronization now needs a pull request. Security warnings for the two-document pnpm lockfile remain limited until GitHub supports it or a separately verified dependency submission path is introduced.
-
+Dependabot may need manual help rebasing version-specific patches. Required checks must be updated if CI job names change. Upstream synchronization now needs a pull request. Security warnings for the two-document pnpm lockfile remain limited until GitHub supports it or a separately verified dependency submission path is introduced. Branch pushes and PR events can produce separate CI runs when both triggers are delivered; the fork accepts that extra runner work for the additional eligible event path. Existing PR-only policy steps remain PR-only; push checks do not prove those steps ran.
 
 ## Verification
 
 - Regression — GitHub REST API 2026-03-10 readback confirms PR requirements, admin enforcement, required signatures, resolved conversations, disabled force pushes/deletion, vulnerability alerts (HTTP 204) and enabled security updates. No outside approval is required.
 - Regression — Configuration inspection against pnpm-workspace.yaml confirms all 38 patched packages and Electron are excluded from the ordinary minor/patch group, not ignored. Weekly schedules cap version PRs at five for npm and three for GitHub Actions.
 - Regression — Pinned pnpm 12.6.0 frozen-lockfile installation, YAML parsing, scoped formatting, documentation checks and diff whitespace checks passed. The affected-check planner was inspected; its full-suite fallback was not run locally for this configuration change.
+- Regression — The unchanged CI jobs completed successfully in manual baseline run [41439838545](https://github.com/Tricade/cherry-studio/actions/runs/41439838545) at commit `a5c20d34f2234e9989311ceb62b9d98dc46ac6ef`. This is execution evidence for the baseline, not an eligible PR check. Final push-event execution and merge eligibility must be verified on the published commit.
 
 GitHub scheduling and the dependency graph remain service behavior. Neither YAML checks nor enabled security settings prove complete vulnerability coverage; the documented pnpm 12 limitation still applies.
