@@ -1,0 +1,75 @@
+diff --git a/src/v3/types.ts b/src/v3/types.ts
+index 17bef73f42205b301bc0de7f3f3eb6608791bda8..3b78990e8a58871a756b7536b0c3e43bce8433de 100644
+--- a/src/v3/types.ts
++++ b/src/v3/types.ts
+@@ -2297,6 +2297,13 @@ export class ZodArray<T extends ZodTypeAny, Cardinality extends ArrayCardinality
+       }
+     }
+ 
++    if (
++      (def.exactLength !== null && ctx.data.length > def.exactLength.value) ||
++      (def.maxLength !== null && ctx.data.length > def.maxLength.value)
++    ) {
++      return INVALID;
++    }
++
+     if (ctx.common.async) {
+       return Promise.all(
+         ([...ctx.data] as any[]).map((item, i) => {
+@@ -3727,7 +3734,7 @@ export class ZodSet<Value extends ZodTypeAny = ZodTypeAny> extends ZodType<
+           exact: false,
+           message: def.maxSize.message,
+         });
+-        status.dirty();
++        return INVALID;
+       }
+     }
+ 
+diff --git a/v3/types.cjs b/v3/types.cjs
+index 7c3fa90509fe0149fde8ad5e647b9657014c538f..5d596ae8b422381608c6801ee3a15a65185894ba 100644
+--- a/v3/types.cjs
++++ b/v3/types.cjs
+@@ -1821,6 +1821,10 @@ class ZodArray extends ZodType {
+                 status.dirty();
+             }
+         }
++        if ((def.exactLength !== null && ctx.data.length > def.exactLength.value) ||
++            (def.maxLength !== null && ctx.data.length > def.maxLength.value)) {
++            return parseUtil_js_1.INVALID;
++        }
+         if (ctx.common.async) {
+             return Promise.all([...ctx.data].map((item, i) => {
+                 return def.type._parseAsync(new ParseInputLazyPath(ctx, item, ctx.path, i));
+@@ -2849,7 +2853,7 @@ class ZodSet extends ZodType {
+                     exact: false,
+                     message: def.maxSize.message,
+                 });
+-                status.dirty();
++                return parseUtil_js_1.INVALID;
+             }
+         }
+         const valueType = this._def.valueType;
+diff --git a/v3/types.js b/v3/types.js
+index ea2be4dba5775eabf4d5b5fecdead5e1a0ca52ff..dd228cb96bb0dc5d02447605cc360d2f486a9b98 100644
+--- a/v3/types.js
++++ b/v3/types.js
+@@ -1800,6 +1800,10 @@ export class ZodArray extends ZodType {
+                 status.dirty();
+             }
+         }
++        if ((def.exactLength !== null && ctx.data.length > def.exactLength.value) ||
++            (def.maxLength !== null && ctx.data.length > def.maxLength.value)) {
++            return INVALID;
++        }
+         if (ctx.common.async) {
+             return Promise.all([...ctx.data].map((item, i) => {
+                 return def.type._parseAsync(new ParseInputLazyPath(ctx, item, ctx.path, i));
+@@ -2820,7 +2824,7 @@ export class ZodSet extends ZodType {
+                     exact: false,
+                     message: def.maxSize.message,
+                 });
+-                status.dirty();
++                return INVALID;
+             }
+         }
+         const valueType = this._def.valueType;

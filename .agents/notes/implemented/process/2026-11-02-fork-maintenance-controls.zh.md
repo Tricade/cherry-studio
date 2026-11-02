@@ -16,7 +16,9 @@ Tricade 分叉仓库尚未保护 `main`。继承的 Dependabot 配置只检查 G
 
 启用漏洞警报和 Dependabot 安全更新。GitHub 当前的 [pnpm 支持文档](https://docs.github.com/en/code-security/reference/supply-chain-security/supported-ecosystems-and-repositories#pnpm)说明，版本更新支持 pnpm 12，但依赖关系图无法识别其双文档锁文件。本仓库固定使用 pnpm 12.6.0，并采用该格式。因此，启用设置并不能证明锁文件依赖已获得警报或安全修复覆盖；保留现有可用锁文件，并明确说明这一限制。
 
-通过 `branches: ["**"]` 在所有分支推送时运行现有 CI 工作流，同时保留 PR 触发器、任务、权限和受影响检查规划器。虽然 Actions 已启用且触发器匹配，两个分别创建、已就绪的 PR 均未产生 PR 工作流运行。根据 GitHub 当前的[事件资格规则](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#checks-from-some-workflow-jobs-are-not-evaluated)，成功的手动基线运行不能满足 PR 必需检查，而 `push` 可以。这样可为功能、安全、Dependabot 和上游同步分支提供常规事件路径。[仅分支过滤器](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onpushbranchestagsbranches-ignoretags-ignore)排除标签。PR 事件缺失的原因尚未确定。
+通过 `branches: ["**"]` 在所有分支推送时运行现有 CI 工作流，同时保留 PR 触发器、任务、权限和受影响检查规划器。仓库的 Actions 设置虽然已启用，但单独的 CI 工作流处于 `disabled_fork` 状态；启用该工作流后，PR 和推送自动运行恢复。根据 GitHub 当前的[事件资格规则](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks#checks-from-some-workflow-jobs-are-not-evaluated)，成功的手动基线运行不能满足 PR 必需检查，而 `push` 可以。这样可为功能、安全、Dependabot 和上游同步分支提供常规事件路径。[仅分支过滤器](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onpushbranchestagsbranches-ignoretags-ignore)排除标签。
+
+仅在两个 webhook 凭据均已配置时，才执行飞书失败通知的准备和发送。首个步骤检查其 secret 环境，仅输出 `enabled` 布尔值；后续准备步骤不会收到任一凭据。发送步骤保留独立的 secret 环境。缺少凭据时跳过通知工作，不掩盖验证任务失败。这遵循 GitHub 的[步骤条件与 secret 上下文规则](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstepsif)。
 
 macOS 平台任务使用标准 `macos-26-intel` runner。连续两次完整 CI 运行均未能获得 `macos-latest` runner；GitHub 明确标注 macOS arm64 容量不足，两个任务都在执行任何步骤前结束。2026-11-02 的[官方 runner 表](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)将 `macos-latest` 映射为 macOS 26 arm64，并将 `macos-26-intel` 列为标准 macOS 26 x64 runner。这样保留相同的操作系统主版本，并保持 `pnpm check --group platform` 的选择规则不变。所选原生冒烟测试接受两种 Darwin 架构。Intel 执行不能证明 Apple Silicon 二进制文件或 ABI 的兼容性；这仍需单独的发布验证。不得将 runner 不可用视为检查成功，也不得屏蔽平台门禁。
 
@@ -31,7 +33,7 @@ Dependabot 可能需要人工协助调整版本专属补丁。CI 任务更名后
 ## 验证
 
 - Regression — GitHub REST API 2026-03-10 回读确认了拉取请求要求、管理员约束、提交签名、讨论解决、禁止强制推送和删除、漏洞警报（HTTP 204）及已启用的安全更新。不要求其他人批准。
-- Regression — 对照基线与已协调的 `fix/security-dependencies` 工作区检查配置，确认全部 42 个带补丁的包名及 Electron 均排除在普通次版本和补丁更新组之外，而非被忽略。安全修复新增 `@mistralai/mistralai`、`deepmerge`、`glob` 和 `minimatch`；minimatch 的两个版本使 42 个包名对应 43 个补丁版本键。每周计划将 npm 版本更新拉取请求限制为五个，GitHub Actions 限制为三个。
+- Regression — 配置检查确认全部 43 个带补丁的包名及 Electron 均排除在普通次版本和补丁更新组之外，而非被忽略。安全修复新增 `@mistralai/mistralai`、`deepmerge`、`glob`、`minimatch` 和 `zod`；minimatch 和 Zod 各有两个版本，使 43 个包名对应 45 个补丁版本键。每周计划将 npm 版本更新拉取请求限制为五个，GitHub Actions 限制为三个。
 - Regression — 固定版本 pnpm 12.6.0 的冻结锁文件安装、YAML 解析、限定文件格式检查、文档检查和差异空白检查均通过。已检查受影响验证计划；未针对本配置变更在本地执行其全套测试回退。
 - Regression — 未修改的 CI 任务已在提交 `a5c20d34f2234e9989311ceb62b9d98dc46ac6ef` 的手动基线运行 [41439838545](https://github.com/Tricade/cherry-studio/actions/runs/41439838545) 中成功完成。这证明了基线的实际执行，但不属于合格的 PR 检查。最终仍需在发布的提交上验证推送事件执行和合并资格。
 
