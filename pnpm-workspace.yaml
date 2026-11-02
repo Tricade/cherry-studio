@@ -15,20 +15,23 @@ packageExtensions:
       devlop: "1.1.0"
 
 overrides:
+  # Keep renderer peers on the React/React DOM pair verified before the security updates.
+  react: "19.2.3"
+  react-dom: "19.2.3"
   # Linux x64 must stay usable without AVX/AVX2; the fork's prebuilt vec0.so requires them (#22048).
   "@aiany/sqlite-vec-linux-x64": "npm:sqlite-vec-linux-x64@0.1.9"
   "@earendil-works/pi-ai@1.4.0>@google/genai": "2.23.0"
   picomatch: "4.0.4"
-  "concurrently>shell-quote": "1.8.4"
+  "concurrently>shell-quote": "1.11.0"
   fast-xml-parser: ">=5.10.1"
-  protobufjs: "^7.5.5"
+  "protobufjs@>=7.0.0 <7.6.5": "7.6.5"
   "minimatch@<3.1.3": "3.1.5"
   "minimatch@>=5.0.0 <5.1.8": "5.1.8"
   "minimatch@>=9.0.0 <9.0.7": "9.0.7"
-  "minimatch@>=10.0.0 <10.2.3": "10.2.3"
-  "brace-expansion@<1.1.18": "1.1.18"
-  "brace-expansion@>=2.0.0 <2.1.4": "2.1.4"
-  "brace-expansion@>=5.0.0 <5.0.9": "5.0.9"
+  "minimatch@>=10.0.0 <10.2.6": "10.2.6"
+  "brace-expansion@<1.1.21": "1.1.21"
+  "brace-expansion@>=2.0.0 <2.1.7": "2.1.7"
+  "brace-expansion@>=5.0.0 <5.0.12": "5.0.12"
   "@smithy/types": "4.7.1"
   # All consumers accept this version; one core avoids repeated nested copies in release packages.
   "@smithy/core": "3.35.0"
@@ -38,33 +41,33 @@ overrides:
   "@codemirror/lint": "6.9.5"
   "@lezer/common": "1.5.1"
   prosemirror-model: "1.25.9"
-  prosemirror-view: "1.41.9"
+  prosemirror-view: "1.42.3"
   prosemirror-transform: "1.12.0"
   esbuild: "^0.25.0"
   node-abi: "4.33.0"
   openai: "npm:@cherrystudio/openai@6.15.0"
   tar-fs: "^2.1.4"
-  "tar@>=7.0.0 <7.5.19": "7.5.19"
-  "@xmldom/xmldom@>=0.8.0 <0.8.13": "0.8.13"
-  "@xmldom/xmldom@>=0.9.0 <0.9.10": "0.9.10"
-  "axios@<1.16.0": "1.16.0"
-  "fast-uri@>=3.0.0 <3.1.5": "3.1.5"
-  "ip-address@<10.3.1": "10.3.1"
-  "js-yaml@>=3.0.0 <3.15.0": "3.15.0"
-  "js-yaml@>=4.0.0 <4.3.0": "4.3.0"
+  "tar@>=7.0.0 <7.5.21": "7.5.21"
+  "@xmldom/xmldom@>=0.8.0 <0.8.15": "0.8.15"
+  "@xmldom/xmldom@>=0.9.0 <0.9.12": "0.9.12"
+  "axios@>=1.0.0 <1.20.0": "1.20.0"
+  "fast-uri@>=3.0.0 <3.1.9": "3.1.9"
+  "ip-address@>=10.0.0 <10.7.4": "10.7.4"
+  "js-yaml@>=3.0.0 <3.15.2": "3.15.2"
+  "js-yaml@>=4.0.0 <4.3.2": "4.3.2"
   "linkify-it@>=5.0.0 <5.0.2": "5.0.2"
   "lodash-es@<4.18.1": "4.18.1"
-  "seroval@<1.5.3": "1.5.3"
-  "svgo@>=3.0.0 <3.3.4": "3.3.4"
+  "seroval@>=1.0.0 <1.6.11": "1.6.11"
+  "svgo@>=3.0.0 <3.3.5": "3.3.5"
   "tmp@>=0.2.0 <0.2.7": "0.2.7"
-  yaml: "2.8.2"
-  sharp: "0.35.3"
-  "@img/sharp-darwin-arm64": "0.35.3"
-  "@img/sharp-darwin-x64": "0.35.3"
-  "@img/sharp-linux-arm": "0.35.3"
-  "@img/sharp-linux-arm64": "0.35.3"
-  "@img/sharp-linux-x64": "0.35.3"
-  "@img/sharp-win32-x64": "0.35.3"
+  yaml: "2.8.3"
+  sharp: "0.35.5"
+  "@img/sharp-darwin-arm64": "0.35.5"
+  "@img/sharp-darwin-x64": "0.35.5"
+  "@img/sharp-linux-arm": "0.35.5"
+  "@img/sharp-linux-arm64": "0.35.5"
+  "@img/sharp-linux-x64": "0.35.5"
+  "@img/sharp-win32-x64": "0.35.5"
   "@napi-rs/canvas": "0.1.97"
   # transformers 4.2.0 pins 1.24.3; keep every inference path on the patched lifecycle-safe build.
   onnxruntime-node: "1.25.1"
@@ -84,7 +87,60 @@ overrides:
   # to the patched build so the app runs exactly one `ai` module.
   ai: "6.0.185"
 
+  # Backport security fixes within each consumer's existing major-version family.
+  "@babel/core@>=7.0.0 <7.29.6": "7.29.6"
+  "@hono/node-server@>=1.0.0 <1.19.15": "1.19.15"
+  "@opentelemetry/core@>=2.0.0 <2.8.0": "2.8.0"
+  "@vitest/mocker@>=5.0.0 <5.0.5": "5.0.5"
+  "adm-zip@<0.6.1": "0.6.1"
+  "ajv@>=8.0.0 <8.18.0": "8.18.0"
+  "body-parser@>=2.0.0 <2.4.0": "2.4.0"
+  "builder-util-runtime@>=9.0.0 <9.7.0": "9.7.0"
+  "dompurify@>=3.0.0 <3.4.17": "3.4.17"
+  "follow-redirects@>=1.0.0 <1.16.2": "1.16.2"
+  "hono@>=4.0.0 <4.13.11": "4.13.11"
+  "markdown-it@>=14.0.0 <14.3.3": "14.3.3"
+  "mermaid@>=11.0.0 <11.16.1": "11.16.1"
+  "moment@>=2.0.0 <2.31.0": "2.31.0"
+  "nanoid@>=3.0.0 <3.3.18": "3.3.18"
+  "nanoid@>=5.0.0 <5.1.16": "5.1.16"
+  "postcss@>=8.0.0 <8.5.23": "8.5.23"
+  "proxy-addr@>=2.0.0 <2.0.8": "2.0.8"
+  "qs@>=6.0.0 <6.16.1": "6.16.1"
+  "smol-toml@>=1.0.0 <1.9.0": "1.9.0"
+  "source-map-js@>=1.0.0 <1.2.2": "1.2.2"
+  "tinypool@>=2.0.0 <2.1.2": "2.1.2"
+  "undici@>=6.0.0 <6.29.1": "6.29.1"
+  "undici@>=7.0.0 <7.30.1": "7.30.1"
+  "undici@>=8.0.0 <8.12.2": "8.12.2"
+  "uuid@>=11.0.0 <11.1.1": "11.1.1"
+  "uuid@>=13.0.0 <13.0.1": "13.0.1"
+  "vite@>=8.0.0 <8.2.4": "8.2.4"
+  katex: "0.18.2"
+  "zod@>=4.0.0 <4.6.6": "4.6.6"
+  # SDK 1.32.2 explicitly supports the patched Node adapter's v2 API.
+  "@modelcontextprotocol/sdk@>=1.0.0 <1.32.2": "1.32.2"
+  "@modelcontextprotocol/sdk>@hono/node-server": "2.1.3"
+  "@ai-sdk/devtools>@hono/node-server": "2.1.3"
+  "@tiptap/extension-bubble-menu": "3.30.5"
+  "@tiptap/extension-floating-menu": "3.30.5"
+  "@tiptap/y-tiptap": "3.0.7"
+  # These consumers retain the parse(), create/extract(), v4() and linkify factory APIs.
+  "@vectorstores/readers>csv-parse": "7.0.3"
+  "@mapbox/node-pre-gyp>tar": "7.5.21"
+  "exceljs>uuid": "11.1.1"
+  "gaxios>uuid": "11.1.1"
+  "ansi-to-react>linkify-it": "5.0.2"
+  # OfficeParser uses the core getDocument() API and the unchanged local legacy worker paths.
+  "officeparser>pdfjs-dist": "6.2.108"
+
 patchedDependencies:
+  "@mistralai/mistralai@1.11.0": patches/@mistralai__mistralai@1.11.0.patch
+  # Preserve installed APIs while backporting the upstream traversal/optimization fixes.
+  "deepmerge@4.3.1": patches/deepmerge@4.3.1.patch
+  "glob@13.0.6": patches/glob@13.0.6.patch
+  "minimatch@9.0.7": patches/minimatch@9.0.7.patch
+  "minimatch@10.2.6": patches/minimatch@10.2.6.patch
   dingtalk-stream@2.1.7-beta.1: patches/dingtalk-stream@2.1.7-beta.1.patch
   "@napi-rs/system-ocr@1.2.0": patches/@napi-rs__system-ocr@1.2.0.patch
   "tesseract.js@6.0.1": patches/tesseract.js-npm-6.0.1-2562a7e46d.patch
@@ -97,8 +153,8 @@ patchedDependencies:
   "@ai-sdk/openai@3.0.109": patches/@ai-sdk__openai@3.0.109.patch
   "@ai-sdk/google@3.0.132": patches/@ai-sdk__google@3.0.132.patch
   "@ai-sdk/anthropic": patches/@ai-sdk__anthropic.patch
-  "@tiptap/extension-drag-handle@3.26.1": patches/@tiptap__extension-drag-handle@3.26.1.patch
-  "@tiptap/markdown@3.26.1": patches/@tiptap__markdown@3.26.1.patch
+  "@tiptap/extension-drag-handle@3.30.5": patches/@tiptap__extension-drag-handle@3.30.5.patch
+  "@tiptap/markdown@3.30.5": patches/@tiptap__markdown@3.30.5.patch
   "@openrouter/ai-sdk-provider@2.10.0": patches/@openrouter__ai-sdk-provider@2.10.0.patch
   onnxruntime-node@1.25.1: patches/onnxruntime-node@1.25.1.patch
   sherpa-onnx-node@1.13.6: patches/sherpa-onnx-node@1.13.6.patch
@@ -116,7 +172,7 @@ patchedDependencies:
   # #20329: preserve current animation targets when React Activity reconnects.
   # Remove when an upstream release includes the blocked-initial-animation remount fix.
   motion-dom@12.42.0: patches/motion-dom@12.42.0.patch
-  "@tiptap/extension-list@3.26.1": patches/@tiptap__extension-list@3.26.1.patch
+  "@tiptap/extension-list@3.30.5": patches/@tiptap__extension-list@3.30.5.patch
   docx-preview@0.3.7: patches/docx-preview@0.3.7.patch
   "@elysia/node@1.4.6": patches/@elysia__node@1.4.6.patch
   bonjour-service@1.3.0: patches/bonjour-service@1.3.0.patch
