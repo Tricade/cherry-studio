@@ -21,6 +21,7 @@ overrides:
   # Linux x64 must stay usable without AVX/AVX2; the fork's prebuilt vec0.so requires them (#22048).
   "@aiany/sqlite-vec-linux-x64": "npm:sqlite-vec-linux-x64@0.1.9"
   "@earendil-works/pi-ai@1.4.0>@google/genai": "2.23.0"
+  "@mistralai/mistralai>zod": "4.6.6"
   picomatch: "4.0.4"
   "concurrently>shell-quote": "1.11.0"
   fast-xml-parser: ">=5.10.1"
@@ -135,7 +136,6 @@ overrides:
   "officeparser>pdfjs-dist": "6.2.108"
 
 patchedDependencies:
-  "@mistralai/mistralai@1.11.0": patches/@mistralai__mistralai@1.11.0.patch
   # Preserve installed APIs while backporting the upstream traversal/optimization fixes.
   "deepmerge@4.3.1": patches/deepmerge@4.3.1.patch
   "glob@13.0.6": patches/glob@13.0.6.patch
@@ -188,8 +188,8 @@ patchedDependencies:
 
   # Carry native input correlation until an upstream release provides the same placement events.
   "@earendil-works/pi-coding-agent@1.4.0": patches/@earendil-works__pi-coding-agent@1.4.0.patch
-  zod@3.25.76: patches/zod@3.25.76.patch
   zod@4.6.6: patches/zod@4.6.6.patch
+  "@mistralai/mistralai@2.7.0": patches/@mistralai__mistralai@2.7.0.patch
 
 allowBuilds:
   "@google/genai": false
