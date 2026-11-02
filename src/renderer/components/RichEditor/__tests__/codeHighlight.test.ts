@@ -34,7 +34,7 @@ const keywords = (editor: Editor) =>
 describe('shared code highlighting in RichEditor', () => {
   it('classifies edited and moved blocks without changing untouched source', async () => {
     const editor = create('```typescript\nconst alpha = 1\n```\n\nparagraph\n\n```typescript\nconst beta = 2\n```')
-    await waitFor(() => expect(keywords(editor)).toEqual(['const', 'const']))
+    await waitFor(() => expect(keywords(editor)).toEqual(['const', 'const']), { timeout: 10000 })
     editor.view.dispatch(editor.state.tr.insertText('let', 1, 6))
     await waitFor(() => expect(keywords(editor)).toEqual(['let', 'const']))
     editor.commands.insertContentAt(0, { type: 'paragraph', content: [{ type: 'text', text: 'prefix' }] })

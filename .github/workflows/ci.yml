@@ -304,23 +304,38 @@ jobs:
     needs: [basic-checks, general-test, package-test, render-test]
     if: always() && (needs.basic-checks.result == 'failure' || needs.general-test.result == 'failure' || needs.package-test.result == 'failure' || needs.render-test.result == 'failure') && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
+      - name: Check notification configuration
+        id: notification-config
+        env:
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          FEISHU_WEBHOOK_SECRET: ${{ secrets.FEISHU_WEBHOOK_SECRET }}
+        run: |
+          if [[ -n "$FEISHU_WEBHOOK_URL" && -n "$FEISHU_WEBHOOK_SECRET" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check out Git repository
+        if: steps.notification-config.outputs.enabled == 'true'
         uses: actions/checkout@v7
 
       - name: Install Node.js
+        if: steps.notification-config.outputs.enabled == 'true'
         uses: actions/setup-node@v7
         with:
           node-version-file: ".node-version"
 
       - name: Install pnpm
+        if: steps.notification-config.outputs.enabled == 'true'
         uses: pnpm/action-setup@v5
 
       - name: Get pnpm store directory
+        if: steps.notification-config.outputs.enabled == 'true'
         id: pnpm-cache
         shell: bash
         run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
 
       - name: Cache pnpm dependencies
+        if: steps.notification-config.outputs.enabled == 'true'
         uses: actions/cache@v6
         with:
           path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
@@ -329,9 +344,11 @@ jobs:
             ${{ runner.os }}-pnpm-
 
       - name: Install Dependencies
+        if: steps.notification-config.outputs.enabled == 'true'
         run: pnpm install
 
       - name: Send failure notification to Feishu
+        if: steps.notification-config.outputs.enabled == 'true'
         env:
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
           FEISHU_WEBHOOK_SECRET: ${{ secrets.FEISHU_WEBHOOK_SECRET }}

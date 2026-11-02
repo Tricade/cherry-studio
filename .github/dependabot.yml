@@ -60,6 +60,7 @@ updates:
           - streamdown
           - tesseract.js
           - vfile-location
+          - zod
         update-types:
           - minor
           - patch
