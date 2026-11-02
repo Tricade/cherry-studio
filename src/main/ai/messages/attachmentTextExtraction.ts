@@ -46,8 +46,8 @@ async function extract(entryId: FileEntryId, ext: string): Promise<string | null
   if (OFFICE_PARSER_EXTS.has(ext)) {
     // Delayed loading: officeparser (and the pdf stack it drags in) stays out of the boot path.
     const { default: officeParser } = await import('officeparser')
-    const text = await officeParser.parseOfficeAsync(buffer, { tempFilesLocation: application.getPath('app.temp') })
-    return text.trim()
+    const document = await officeParser.parseOffice(buffer)
+    return document.toText().trim()
   }
   if (getFileTypeByExt(ext) === FILE_TYPE.OTHER) {
     return decodeTextBufferIfText(buffer)?.trim() ?? null

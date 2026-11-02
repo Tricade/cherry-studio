@@ -5,8 +5,8 @@
 
 import { createReadStream } from 'fs'
 
-import { parser } from 'stream-json'
-import { streamArray } from 'stream-json/streamers/StreamArray'
+import { parser } from 'stream-json/parser.js'
+import { streamArray } from 'stream-json/streamers/stream-array.js'
 
 export class JsonStreamReader {
   private filePath: string
@@ -26,7 +26,7 @@ export class JsonStreamReader {
     onBatch: (items: T[], batchIndex: number) => Promise<void>
   ): Promise<number> {
     return new Promise((resolve, reject) => {
-      const pipeline = createReadStream(this.filePath).pipe(parser()).pipe(streamArray())
+      const pipeline = createReadStream(this.filePath).pipe(parser.asStream()).pipe(streamArray.asStream())
 
       let batch: T[] = []
       let batchIndex = 0
@@ -80,7 +80,7 @@ export class JsonStreamReader {
    */
   async count(): Promise<number> {
     return new Promise((resolve, reject) => {
-      const pipeline = createReadStream(this.filePath).pipe(parser()).pipe(streamArray())
+      const pipeline = createReadStream(this.filePath).pipe(parser.asStream()).pipe(streamArray.asStream())
 
       let count = 0
 
@@ -102,7 +102,7 @@ export class JsonStreamReader {
    */
   async readSample<T>(n: number): Promise<T[]> {
     return new Promise((resolve, reject) => {
-      const pipeline = createReadStream(this.filePath).pipe(parser()).pipe(streamArray())
+      const pipeline = createReadStream(this.filePath).pipe(parser.asStream()).pipe(streamArray.asStream())
 
       const items: T[] = []
 
