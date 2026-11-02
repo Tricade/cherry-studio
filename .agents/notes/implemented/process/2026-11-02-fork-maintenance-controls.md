@@ -29,7 +29,7 @@ Dependabot may need manual help rebasing version-specific patches. Required chec
 ## Verification
 
 - Regression — GitHub REST API 2026-03-10 readback confirms PR requirements, admin enforcement, required signatures, resolved conversations, disabled force pushes/deletion, vulnerability alerts (HTTP 204) and enabled security updates. No outside approval is required.
-- Regression — Configuration inspection against pnpm-workspace.yaml confirms all 38 patched packages and Electron are excluded from the ordinary minor/patch group, not ignored. Weekly schedules cap version PRs at five for npm and three for GitHub Actions.
+- Regression — Configuration inspection against the baseline and the coordinated `fix/security-dependencies` workspace confirms all 42 patched package names and Electron are excluded from the ordinary minor/patch group, not ignored. The security work adds `@mistralai/mistralai`, `deepmerge`, `glob` and `minimatch`; two minimatch versions yield 43 patch-version keys for 42 names. Weekly schedules cap version PRs at five for npm and three for GitHub Actions.
 - Regression — Pinned pnpm 12.6.0 frozen-lockfile installation, YAML parsing, scoped formatting, documentation checks and diff whitespace checks passed. The affected-check planner was inspected; its full-suite fallback was not run locally for this configuration change.
 - Regression — The unchanged CI jobs completed successfully in manual baseline run [41439838545](https://github.com/Tricade/cherry-studio/actions/runs/41439838545) at commit `a5c20d34f2234e9989311ceb62b9d98dc46ac6ef`. This is execution evidence for the baseline, not an eligible PR check. Final push-event execution and merge eligibility must be verified on the published commit.
 

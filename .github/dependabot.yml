@@ -29,6 +29,7 @@ updates:
           - "@earendil-works/pi-ai"
           - "@earendil-works/pi-coding-agent"
           - "@elysia/node"
+          - "@mistralai/mistralai"
           - "@napi-rs/system-ocr"
           - "@openrouter/ai-sdk-provider"
           - "@opeoginni/github-copilot-openai-compatible"
@@ -41,12 +42,15 @@ updates:
           - app-builder-lib
           - atomically
           - bonjour-service
+          - deepmerge
           - dingtalk-stream
           - docx-preview
           - electron
           - electron-updater
           - emoji-picker-react
           - file-stream-rotator
+          - glob
+          - minimatch
           - motion-dom
           - ollama-ai-provider-v2
           - onnxruntime-node

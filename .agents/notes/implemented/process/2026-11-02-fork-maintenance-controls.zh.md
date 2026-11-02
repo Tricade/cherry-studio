@@ -29,7 +29,7 @@ Dependabot 可能需要人工协助调整版本专属补丁。CI 任务更名后
 ## 验证
 
 - Regression — GitHub REST API 2026-03-10 回读确认了拉取请求要求、管理员约束、提交签名、讨论解决、禁止强制推送和删除、漏洞警报（HTTP 204）及已启用的安全更新。不要求其他人批准。
-- Regression — 对照 pnpm-workspace.yaml 检查配置，确认全部 38 个带补丁的包及 Electron 均排除在普通次版本和补丁更新组之外，而非被忽略。每周计划将 npm 版本更新拉取请求限制为五个，GitHub Actions 限制为三个。
+- Regression — 对照基线与已协调的 `fix/security-dependencies` 工作区检查配置，确认全部 42 个带补丁的包名及 Electron 均排除在普通次版本和补丁更新组之外，而非被忽略。安全修复新增 `@mistralai/mistralai`、`deepmerge`、`glob` 和 `minimatch`；minimatch 的两个版本使 42 个包名对应 43 个补丁版本键。每周计划将 npm 版本更新拉取请求限制为五个，GitHub Actions 限制为三个。
 - Regression — 固定版本 pnpm 12.6.0 的冻结锁文件安装、YAML 解析、限定文件格式检查、文档检查和差异空白检查均通过。已检查受影响验证计划；未针对本配置变更在本地执行其全套测试回退。
 - Regression — 未修改的 CI 任务已在提交 `a5c20d34f2234e9989311ceb62b9d98dc46ac6ef` 的手动基线运行 [41439838545](https://github.com/Tricade/cherry-studio/actions/runs/41439838545) 中成功完成。这证明了基线的实际执行，但不属于合格的 PR 检查。最终仍需在发布的提交上验证推送事件执行和合并资格。
 
