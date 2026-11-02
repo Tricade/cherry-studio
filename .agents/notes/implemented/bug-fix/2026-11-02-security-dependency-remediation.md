@@ -29,17 +29,20 @@ Vitest 5.0.5 requires projects in the same execution group to use the same `maxW
 
 The Markdown source-line fixture uses a multiline paragraph for padding so serialization tests do not start an unowned asynchronous highlight worker. Vitest's worker simulation can deliver a late response after the JSDOM environment is gone. The dedicated highlighting suite keeps real worker coverage and waits up to ten seconds for initial syntax output, matching its existing cold-start case; a one-second default timed out after reinstalling dependencies.
 
-Three remaining findings use local patches while their consumer migrations are pending. Zod's bundled compatibility API and Mistral's OCR operation also retain targeted protections:
+Two remaining findings use local patches while their consumer migrations are pending. Zod's bundled compatibility API and Mistral's OCR operation also retain targeted protections:
 
 | Package | Backport and runtime entry |
 | --- | --- |
-| deepmerge 4.3.1 | Define copied keys as own data properties so `__proto__` cannot invoke the destination's prototype setter; patch source, CJS and UMD builds |
 | glob 13.0.6 | Apply the four upstream `return cb()` abort fixes in CJS and ESM; point the package root at its existing unbundled entry, because the default minified bundle embeds the old walker |
 | minimatch 9.0.7 and 10.2.6 | Backport upstream's optimizer expansion cap and the cutoff for quadratic deduplication; preserve both module formats and existing major-version consumers |
 | Zod 4.6.6's v3 compatibility API | Reject arrays/sets exceeding an upper size bound before visiting elements; patch source, CJS and ESM, preserving existing size diagnostics |
 | Mistral SDK 2.7.0 OCR | Migrate from the standalone Zod 3 dependency to Zod 4.6.6; validate HTTP 200/422 bodies with the public early-abort API before parsing valid output; malformed output gets one diagnostic |
 
 Minimatch 3/5 lack the reported optimization-level-2 preprocessing path. The version-only advisory range still lists them. Minimatch 9 keeps its original public types; the backport does not advertise a new brace-expansion API.
+
+Remove every deepmerge 4.3.1 path rather than retaining its backport. [html-to-text 10.0.1](https://github.com/html-to-text/node-html-to-text/blob/1c39d9885075836a7e45d0236c7a5541dede8e52/packages/html-to-text/CHANGELOG.md) uses deepmerge-ts 8 (resolved to 8.0.2) and supports the repository's Node runtime. Keep the existing speech selectors and formatters. The SVG generator calls its existing SVGO 3.3.5 optimizer and SVGR 8.1.0 JSX plugin directly, then [Prettier 3.8.1's asynchronous formatter](https://github.com/prettier/prettier/blob/3.8.1/website/versioned_docs/version-stable/api.md). This replaces two wrappers that still depend on deepmerge. Preserve the explicit optimization/formatting options, embedded-HTML removal, viewBox/path data and per-instance React IDs. Remove the unused deepmerge patch and Dependabot group exclusion.
+
+The UI package's existing standalone type check also fails on its Markdown CSS import with the baseline generator. Its root command resolves TypeScript 7.0.2, whose [side-effect import check defaults to true](https://github.com/microsoft/TypeScript/blob/v7.0.2/src/compiler/commandLineParser.ts). Declare CSS asset imports in the UI package's existing `src/types` directory instead of disabling that check or changing the compiler. This is a type-only declaration, not a CSS loader or a runtime change.
 
 ## Alternatives considered
 
@@ -50,7 +53,7 @@ Minimatch 3/5 lack the reported optimization-level-2 preprocessing path. The ver
 
 ## Consequences
 
-After the Mistral migration, the version-only audit exits 1 with three records: two moderate glob/minimatch findings and one low deepmerge finding. The standalone Zod 3.25.76 package is absent from the resolved lockfile. The remaining mechanisms have tested local protections and unchanged upstream version numbers. No advisory is suppressed, and the audit is not reported as green.
+After the Mistral and deepmerge migrations, the version-only audit exits 1 with two moderate glob/minimatch findings. Standalone Zod 3.25.76, deepmerge 4.3.1 and its two SVGR wrapper consumers are absent from the resolved lockfile. The remaining mechanisms have tested local protections and unchanged upstream version numbers. No advisory is suppressed, and the audit is not reported as green.
 
 **Zod 3 dependency removed, bundled compatibility protection retained:** the Mistral 1.11.0 → Zod 3.25.76 path reported by [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5) is replaced by Mistral 2.7.0 → Zod 4.6.6. Before the original backport, a 10,000-element invalid constrained array produced 10,001 issues through both Zod 3.25.76 and Zod 4.6.6's `/v3` path; patched Zod 4's root produced one. The [official fix](https://github.com/colinhacks/zod/commit/a0ebf970f2d752e5f58527cd2942ff48be4f46bd) changes v4 only, and the [v3 follow-up](https://github.com/colinhacks/zod/issues/6653) does not provide a published fixed v3 release. The remaining compatibility parser keeps its tested early rejection; the unused standalone-package patch is removed.
 
@@ -67,6 +70,7 @@ The existing docs impact candidates describe unchanged architecture, migration f
 ## Verification
 
 - Regression — `pnpm test:scripts scripts/__tests__/dependencySecurity.test.ts scripts/__tests__/dependencyCompatibility.test.ts`: bounded Zod errors, inert prototype keys, bounded glob optimization, stopped directory I/O after abort, CSV/ANSI output, native tar extraction and real loopback HTTP response.
+- Compatibility — `packages/ui/scripts/__tests__/icons-generate.test.ts`, `src/renderer/services/voice/__tests__/readableText.test.ts` and `scripts/__tests__/dependencySecurity.test.ts`: 39 cases pass after removing deepmerge. The two new generator cases also pass on the old pipeline; they compile and render real generated components, preserving geometry, scalable dimensions and per-instance gradient/clip/href references while removing embedded HTML. Existing speech tests retain private-content omissions, text order, meaningful image descriptions and chunk limits. The new merge dependency keeps prototype keys inert. UI and renderer type checks pass after the CSS declaration; the baseline CSS error is recorded separately.
 - Regression — `pnpm test:scripts scripts/__tests__/mistralOcrValidation.test.ts`: ten cases cover early stopping for malformed pages, nested images and HTTP 422, diagnostic bounds, 256 valid pages, structured API errors, unrelated valid union responses and real SDK upload/signed-URL/deletion transport with endpoint, authentication and cancellation propagation. Before porting the protection, SDK 2.7.0 visited all 2,000 invalid items and failed four of the then-six cases; after the patch all ten pass.
 - Regression — `scripts/__tests__/legacyZodCollectionBounds.test.ts`: 24 retained cases cover CJS/ESM entrypoints of Zod 4's bundled v3 parser, sync/async array and set bounds, zero element work on oversized input, transforms, lower bounds, union fallback and nested/overlapping diagnostics. Only tests for the removed standalone Zod 3 package are removed.
 - Compatibility — the existing Mistral utility/document handler suites pass nine tests, and `pnpm typecheck:node` passes. A separate CommonJS fixture under Electron 44.9.3's Node 24.22.0 runtime loads the ESM SDK and transforms a valid synthetic OCR response; this is not a full application or installer test. SDK telemetry remains unconfigured; its optional exporter peer expects 0.220.x while the app supplies 0.200.x, so explicitly enabling that unused SDK telemetry path is outside this verification.

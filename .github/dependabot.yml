@@ -42,7 +42,6 @@ updates:
           - app-builder-lib
           - atomically
           - bonjour-service
-          - deepmerge
           - dingtalk-stream
           - docx-preview
           - electron
