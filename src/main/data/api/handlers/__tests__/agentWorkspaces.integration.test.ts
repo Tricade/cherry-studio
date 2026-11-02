@@ -13,6 +13,7 @@ import { agentSessionTable } from '@data/db/schemas/agentSession'
 import { agentWorkspaceTable } from '@data/db/schemas/agentWorkspace'
 import { pinTable } from '@data/db/schemas/pin'
 import { agentChannelService } from '@data/services/AgentChannelService'
+import { agentProjectService } from '@data/services/AgentProjectService'
 import { agentSessionService } from '@data/services/AgentSessionService'
 import { agentWorkspaceService } from '@data/services/AgentWorkspaceService'
 import { jobScheduleService } from '@data/services/JobScheduleService'
@@ -138,13 +139,38 @@ describe('agentWorkspaceHandlers integration', () => {
     ).resolves.toEqual({
       sessions: { items: [], total: 0 },
       channels: { items: [{ id: channel.id, name: channel.name }], total: 1 },
-      tasks: { items: [{ id: task.id, name: task.name }], total: 1 }
+      tasks: { items: [{ id: task.id, name: task.name }], total: 1 },
+      projects: { items: [], total: 0 }
     })
 
     agentSessionService.deleteWorkspaceCascade(workspace.id)
 
     expect(agentChannelService.getChannel(channel.id)?.workspace).toEqual({ type: 'system' })
     expect(jobScheduleService.getById(task.id)?.jobInputTemplate).toMatchObject({ workspace: { type: 'system' } })
+  })
+
+  it('lists project references and preserves their workspace until the project is removed', async () => {
+    const workspace = await createWorkspace('project')
+    const project = agentProjectService.create({
+      name: 'Project team',
+      instructions: '',
+      workspaceId: workspace.id,
+      agentIds: [agentId],
+      knowledgeBaseIds: []
+    })
+
+    await expect(
+      agentWorkspaceHandlers['/agent-workspaces/:workspaceId/references'].GET({
+        params: { workspaceId: workspace.id }
+      })
+    ).resolves.toMatchObject({ projects: { items: [{ id: project.id, name: project.name }], total: 1 } })
+    expect(() => agentSessionService.deleteWorkspaceCascade(workspace.id)).toThrow('Remove its project first')
+    expect(agentWorkspaceService.getById(workspace.id).id).toBe(workspace.id)
+    expect(agentProjectService.getById(project.id).workspaceId).toBe(workspace.id)
+
+    agentProjectService.delete(project.id)
+    agentSessionService.deleteWorkspaceCascade(workspace.id)
+    expect(dbh.db.select().from(agentWorkspaceTable).where(eq(agentWorkspaceTable.id, workspace.id)).all()).toEqual([])
   })
 
   it('caps workspace reference previews while reporting the full total', async () => {

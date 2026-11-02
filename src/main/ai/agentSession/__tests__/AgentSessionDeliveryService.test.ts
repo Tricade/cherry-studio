@@ -1,3 +1,5 @@
+import { setupTestDatabase } from '@test-helpers/db'
+import { defaultServiceInstances } from '@test-mocks/main/application'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { agentService } from '@data/services/AgentService'
@@ -170,9 +172,7 @@ const manager = {
   whenTerminalDispatchSettled: mocks.whenTerminalDispatchSettled,
   send: mocks.send
 }
-const dbService = {
-  withWriteTx: (fn: (tx: object) => unknown) => fn({})
-}
+const dbService = defaultServiceInstances.DbService
 
 vi.mock('@application', () => ({
   application: {
@@ -234,6 +234,8 @@ const agentDeletionResult: ReturnType<typeof agentService.deleteAgentStateTx> = 
 }
 
 describe('AgentSessionDeliveryService', () => {
+  setupTestDatabase()
+
   beforeEach(() => {
     BaseService.resetInstances()
     vi.clearAllMocks()
@@ -344,13 +346,18 @@ describe('AgentSessionDeliveryService', () => {
     await service.drainInFlight({ timeoutMs: 100 })
 
     expect(mocks.persistDispatchTx).toHaveBeenCalled()
-    expect(mocks.persistDispatchTx).toHaveBeenCalledWith({}, expect.anything(), {
+    expect(mocks.persistDispatchTx).toHaveBeenCalledWith(expect.anything(), expect.anything(), {
       id: 'agent-1',
       updatedAt: now,
       model: 'provider::model',
       type: 'claude-code'
     })
-    expect(mocks.claim).toHaveBeenCalledWith({}, 'target', 'delivery-1', 'assistant-1')
+    expect(mocks.claim).toHaveBeenCalledWith(
+      mocks.persistDispatchTx.mock.calls[0][0],
+      'target',
+      'delivery-1',
+      'assistant-1'
+    )
     expect(mocks.publishDispatchChanges).toHaveBeenCalledWith('target', [accepted, assistant])
     expect(mocks.send).toHaveBeenCalledOnce()
   })
@@ -902,7 +909,7 @@ describe('AgentSessionDeliveryService', () => {
     releaseRuntime()
 
     await expect(purge).resolves.toEqual({ purgedIds: ['expired-session'], hasMore: false })
-    expect(mocks.purgeExpiredByIdsTx).toHaveBeenCalledWith({}, ['expired-session'], 500)
+    expect(mocks.purgeExpiredByIdsTx).toHaveBeenCalledWith(expect.anything(), ['expired-session'], 500)
     expect(delivery.isWriteQuiesced).toBe(false)
   })
 
@@ -1057,7 +1064,7 @@ describe('AgentSessionDeliveryService', () => {
       hasMore: true
     })
     expect(mocks.abortAndDrain).toHaveBeenCalledOnce()
-    expect(mocks.purgeExpiredByIdsTx).toHaveBeenCalledWith({}, ['expired-session'], 500)
+    expect(mocks.purgeExpiredByIdsTx).toHaveBeenCalledWith(expect.anything(), ['expired-session'], 500)
   })
 
   it('closes duplicate placeholder runtimes through the delivery owner', async () => {

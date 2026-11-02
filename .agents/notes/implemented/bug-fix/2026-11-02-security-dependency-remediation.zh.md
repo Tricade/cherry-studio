@@ -25,6 +25,8 @@ Status: implemented
 
 CSV 读取器以默认选项调用 `parse`；原生安装器使用 tar 的 `create`/流式 `extract`；ExcelJS/gaxios 使用 UUID `v4`；ANSI 渲染使用 linkify 工厂、`tlds` 和 `match`。仅针对父依赖的 override 保留这些具体 API，同时升级到 csv-parse 7.0.3、tar 7.5.21、UUID 11.1.1 和 linkify-it 5.0.2。合成使用方测试覆盖实际的依赖解析路径。
 
+Vitest 5.0.5 要求同一执行组中的项目使用相同的 `maxWorkers`。`aiCore` 项目继承其包配置而非根配置，因此显式接收共享的根限制：本地两个 worker，CI 中为 50%。其独立包配置保持不变。划分不同执行组会使无关项目串行运行，却没有解决配置继承缺失。RichEditor 高亮测试通过 `CodeStyleProvider` 挂载真实的 `EditorContent`：在 React 宿主挂载前，Tiptap 3.30.5 只提供不执行渲染的 React node-view 占位元素。单独创建核心 `Editor` 已无法代表应用的生命周期。依据：[Vitest 5.0.5 执行组顺序](https://github.com/vitest-dev/vitest/blob/v5.0.5/docs/config/sequence.md)、[Tiptap 3.30.5 React node view](https://github.com/ueberdosis/tiptap/blob/v3.30.5/packages/react/src/ReactNodeViewRenderer.tsx)。
+
 四个发现通过本地补丁修复，不改变无关使用方的 API：
 
 | 包 | 回移修复与运行时入口 |
@@ -64,3 +66,4 @@ Cherry 的图像/文档处理器调用配置端点的 `ocr.process`。恶意或�
 - Regression — `src/main/data/migration/v2/utils/__tests__/JsonStreamReader.test.ts`：计数、异步批处理、最后的不完整批次、Unicode 及保持惰性的 JSON 原型字段。
 - Regression — `src/main/data/db/__tests__/identifierEscaping.test.ts`：标识符不能变为攻击者选择的 SQLite 子查询；使用真实数据库测试框架及生产迁移。
 - Regression — `src/renderer/components/RichEditor/__tests__/dependencySecurity.test.ts` 与 `src/main/ai/messages/__tests__/officeParsing.test.ts`：持续阻止可执行属性和继承的 KaTeX trust；合成 DOCX/PDF 文本仍可读取。
+- Regression — `CI=true pnpm exec vitest run --project aiCore --project ai-sdk-provider packages/aiCore/src/core/providers/__tests__/ExtensionRegistry.test.ts packages/ai-sdk-provider/src/__tests__/cherryin-provider.test.ts`：原配置在发现测试前即失败；共享 worker 限制使两个项目一起运行，99 项测试通过。挂载 React 编辑器后，现有 `codeHighlight.test.ts` 的五项测试通过，保留高亮、源文本、选区及撤销行为，且没有未处理的 React 错误。

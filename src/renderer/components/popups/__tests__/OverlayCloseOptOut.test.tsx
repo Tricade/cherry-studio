@@ -1,7 +1,6 @@
+import { MockUsePreferenceUtils } from '@test-mocks/renderer/usePreference'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ComponentProps, PropsWithChildren, ReactNode } from 'react'
-import type * as ReactModule from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { PopupHost } from '@renderer/components/PopupHost'
@@ -10,16 +9,11 @@ import { toast } from '@renderer/services/toast'
 import { BACKUP_ACTIVE_WRITERS_ERROR_CODE } from '@shared/types/backup'
 
 const mocks = vi.hoisted(() => ({
-  backup: vi.fn(),
-  skipBackupFile: false
+  backup: vi.fn()
 }))
 
 // This suite exercises the real popup store + host, so opt out of the global mock.
 vi.mock('@renderer/services/popup', async (importOriginal) => await importOriginal())
-
-vi.mock('@data/hooks/usePreference', () => ({
-  usePreference: () => [mocks.skipBackupFile, vi.fn()]
-}))
 
 vi.mock('@logger', () => ({
   loggerService: {
@@ -48,74 +42,7 @@ vi.mock('react-i18next', () => ({
   })
 }))
 
-vi.mock('@cherrystudio/ui', async () => {
-  const React = await vi.importActual<typeof ReactModule>('react')
-  const DialogContext = React.createContext<{ onOpenChange?: (open: boolean) => void } | null>(null)
-
-  return {
-    Button: ({
-      children,
-      type = 'button',
-      ...props
-    }: ComponentProps<'button'> & { variant?: string; danger?: boolean }) => {
-      delete props.variant
-      delete props.danger
-      return (
-        <button type={type} {...props}>
-          {children}
-        </button>
-      )
-    },
-    CircularProgress: () => <div />,
-    Dialog: ({
-      children,
-      open,
-      onOpenChange
-    }: PropsWithChildren<{ open?: boolean; onOpenChange?: (open: boolean) => void }>) =>
-      open ? (
-        <DialogContext value={{ onOpenChange }}>
-          <div>{children}</div>
-        </DialogContext>
-      ) : null,
-    DialogContent: ({
-      children,
-      closeOnOverlayClick = true,
-      onPointerDownOutside
-    }: PropsWithChildren<{
-      closeOnOverlayClick?: boolean
-      onPointerDownOutside?: (event: { defaultPrevented: boolean; preventDefault: () => void }) => void
-    }>) => {
-      const context = React.use(DialogContext)
-
-      return (
-        <>
-          <button
-            type="button"
-            data-testid="dialog-overlay"
-            onClick={() => {
-              const event = {
-                defaultPrevented: false,
-                preventDefault: () => {
-                  event.defaultPrevented = true
-                }
-              }
-
-              onPointerDownOutside?.(event)
-
-              if (closeOnOverlayClick) {
-                context?.onOpenChange?.(false)
-              }
-            }}
-          />
-          <div role="dialog">{children}</div>
-        </>
-      )
-    },
-    DialogFooter: ({ children }: { children: ReactNode }) => <footer>{children}</footer>,
-    DialogHeader: ({ children }: { children: ReactNode }) => <header>{children}</header>,
-    DialogTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>
-  }
-})
+vi.mock('@cherrystudio/ui', async (importOriginal) => await importOriginal())
 
 import BackupPopup from '@renderer/pages/settings/DataSettings/BackupPopup'
 
@@ -124,7 +51,7 @@ import ContentPopup from '../ContentPopup'
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.backup.mockResolvedValue(undefined)
-  mocks.skipBackupFile = false
+  MockUsePreferenceUtils.resetMocks()
   Object.assign(window, {
     electron: {
       ipcRenderer: {
@@ -162,7 +89,7 @@ describe('popup overlay close opt-out', () => {
 
     await screen.findByText('Non dismissable content')
 
-    fireEvent.click(screen.getByTestId('dialog-overlay'))
+    fireEvent.click(document.querySelector('[data-slot="dialog-overlay"]')!)
 
     // The overlay click is suppressed, so the popup stays on screen.
     expect(screen.getByText('Non dismissable content')).toBeInTheDocument()
@@ -175,18 +102,18 @@ describe('popup overlay close opt-out', () => {
       void BackupPopup.show()
     })
 
-    await screen.findByText('backup.content')
+    await screen.findByText('backup.disclosure.full')
 
-    fireEvent.click(screen.getByTestId('dialog-overlay'))
+    fireEvent.click(document.querySelector('[data-slot="dialog-overlay"]')!)
 
-    expect(screen.getByText('backup.content')).toBeInTheDocument()
+    expect(screen.getByText('backup.disclosure.full')).toBeInTheDocument()
   })
 })
 
 describe('BackupPopup submission', () => {
   it('forces a full backup without changing the saved slim-backup preference', async () => {
     const user = userEvent.setup()
-    mocks.skipBackupFile = true
+    MockUsePreferenceUtils.setPreferenceValue('data.backup.general.skip_backup_file', true)
     render(<PopupHost />)
     act(() => {
       void BackupPopup.show({ forceFullBackup: true })
@@ -195,6 +122,7 @@ describe('BackupPopup submission', () => {
     await user.click(await screen.findByRole('button', { name: 'backup.confirm.button' }))
 
     expect(mocks.backup).toHaveBeenCalledExactlyOnceWith(false)
+    expect(MockUsePreferenceUtils.getPreferenceValue('data.backup.general.skip_backup_file')).toBe(true)
   })
 
   it('keeps the popup open and shows a localized error when active writers block backup', async () => {

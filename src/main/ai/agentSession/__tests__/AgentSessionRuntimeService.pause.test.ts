@@ -30,7 +30,10 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@data/services/AgentSessionService', () => ({
-  agentSessionService: { ensureTraceId: mocks.ensureTraceId }
+  agentSessionService: {
+    ensureTraceId: mocks.ensureTraceId,
+    getById: (id: string) => ({ id, projectId: null })
+  }
 }))
 
 vi.mock('@data/services/AgentService', () => ({
