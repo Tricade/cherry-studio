@@ -4693,7 +4693,7 @@
   "settings.fetch.allow_private_network": "Zugriff auf lokale Netzwerkadressen erlauben",
   "settings.fetch.allow_private_network_tip": "Erlaubt Web-Abruf-Tools den Zugriff auf localhost und private Netzwerkadressen. Deaktivieren Sie dies, wenn Modelle keine Dienste auf Ihrem Rechner oder im LAN lesen sollen.",
   "settings.font_size.title": "Nachrichtenschriftgröße",
-  "settings.general.auto_check_update.control": "Dieser Schalter steuert automatische Prüfungen. Manuelle Prüfungen und das Öffnen von Versionshinweisen lösen diese Anfragen weiterhin aus. Bei einer manuellen Prüfung kann außerdem ein verfügbares Update heruntergeladen werden.",
+  "settings.general.auto_check_update.control": "Dieser Schalter steuert automatische Prüfungen und Downloads. Manuelle Prüfungen und das Öffnen der Versionshinweise lösen weiterhin entsprechende Anfragen aus. Bei einer manuellen Prüfung kann ein verfügbares Update auch dann heruntergeladen werden, wenn automatische Prüfungen ausgeschaltet sind.",
   "settings.general.auto_check_update.privacy": "Update-Prüfungen und Versionshinweise rufen releases.cherry-ai.com auf. Dabei werden deine IP-Adresse sowie eine dauerhafte Installations-ID, App-Version, Betriebssystemversion und -architektur, Edition und Region übermittelt. Die Regionserkennung kontaktiert außerdem api.ipinfo.io.",
   "settings.general.auto_check_update.title": "Automatisches Update",
   "settings.general.avatar.builtin": "Integriertes Avatar",

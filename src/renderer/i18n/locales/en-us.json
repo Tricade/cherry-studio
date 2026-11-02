@@ -4693,7 +4693,7 @@
   "settings.fetch.allow_private_network": "Allow fetching local network addresses",
   "settings.fetch.allow_private_network_tip": "Lets web fetch tools reach localhost and private network addresses. Turn this off if you do not want models to read services on your own machine or LAN.",
   "settings.font_size.title": "Message font size",
-  "settings.general.auto_check_update.control": "This switch controls automatic checks. Manual checks and opening release notes still make these requests. Manual checks can also download an available update.",
+  "settings.general.auto_check_update.control": "This switch controls automatic checks and downloads. Manual checks and opening release notes still make these requests. A manual check can download an available update even when automatic checks are off.",
   "settings.general.auto_check_update.privacy": "Update checks and release notes contact releases.cherry-ai.com. Requests expose your IP address and send a persistent installation ID, app version, OS version and architecture, edition and region. Region detection also contacts api.ipinfo.io.",
   "settings.general.auto_check_update.title": "Auto Update",
   "settings.general.avatar.builtin": "Builtin avatar",

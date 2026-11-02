@@ -119,6 +119,21 @@ describe('AboutSettings diagnostics entry', () => {
     expect(mocks.request).toHaveBeenCalledWith('app.updater.check_for_update')
   })
 
+  it('keeps the release-note privacy disclosure visible in portable builds', async () => {
+    mocks.request.mockImplementation(async (route: string) => {
+      if (route === 'app.get_info') return { isPortable: true, version: '2.1.10' }
+      return undefined
+    })
+    await renderAboutSettings()
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('switch', { name: enUS['settings.general.auto_check_update.title'] })
+      ).not.toBeInTheDocument()
+    )
+    expect(screen.getByText(enUS['settings.general.auto_check_update.privacy'])).toBeVisible()
+    expect(screen.queryByText(enUS['settings.general.auto_check_update.control'])).not.toBeInTheDocument()
+  })
+
   it('does not index the removed system diagnostics row', async () => {
     const { entries } = await import('../about.search')
 

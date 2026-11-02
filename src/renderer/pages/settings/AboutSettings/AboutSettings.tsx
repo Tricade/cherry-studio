@@ -269,11 +269,15 @@ const AboutSettings: FC = () => {
                 onCheckedChange={(v) => setAutoCheckUpdate(v)}
               />
             </SettingRow>
-            <div id="update-privacy-disclosure" className="mt-2 space-y-2">
-              <SettingHelpText>{t('settings.general.auto_check_update.privacy')}</SettingHelpText>
-              <SettingHelpText>{t('settings.general.auto_check_update.control')}</SettingHelpText>
-            </div>
+          </>
+        )}
+        <div id="update-privacy-disclosure" className="mt-2 space-y-2">
+          <SettingHelpText>{t('settings.general.auto_check_update.privacy')}</SettingHelpText>
+          {!isPortable && <SettingHelpText>{t('settings.general.auto_check_update.control')}</SettingHelpText>}
+        </div>
 
+        {!isPortable && (
+          <>
             <Divider className="my-3" />
             <SettingRow className="flex-nowrap gap-6">
               <div className="flex min-w-0 flex-1 items-center justify-between gap-6">
