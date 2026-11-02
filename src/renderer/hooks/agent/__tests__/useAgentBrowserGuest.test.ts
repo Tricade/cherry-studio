@@ -56,9 +56,10 @@ it('keeps the new binding alive when a previous attachment completes after effec
   expect(binding).toBeUndefined()
 })
 
-it.each(['focused', 'background', 'unavailable'] as const)(
-  'reports %s input readiness without moving focus into an inert guest',
-  async (expected) => {
+it.each(['focused', 'visible-composer', 'background', 'unavailable'] as const)(
+  'checks %s input readiness without moving the current DOM focus',
+  async (state) => {
+    const expected = state === 'visible-composer' ? 'background' : state
     let onFocus!: (request: EventPayload<'browser.input.focus_requested'>) => void
     let reply: InputFor<'browser.input.focused'> | undefined
     vi.spyOn(ipcApi, 'on').mockImplementation((event, listener) => {
@@ -79,8 +80,9 @@ it.each(['focused', 'background', 'unavailable'] as const)(
     plane.append(guest)
     document.body.append(composer, plane)
     composer.focus()
-    if (expected === 'background') plane.setAttribute('inert', '')
+    if (state === 'background') plane.setAttribute('inert', '')
     if (expected === 'unavailable') guest.remove()
+    if (state === 'focused') guest.focus()
     const hook = renderHook(() => useAgentBrowserGuest('session-a', guest, 0))
     try {
       await waitFor(() => expect(hook.result.current).toBe('tab-1'))
@@ -93,11 +95,11 @@ it.each(['focused', 'background', 'unavailable'] as const)(
       }
       onFocus({ ...request, tabId: 'stale-tab' })
       expect(reply).toBeUndefined()
-      expect(document.activeElement).toBe(composer)
+      expect(document.activeElement).toBe(expected === 'focused' ? guest : composer)
       onFocus(request)
       expect(reply).toMatchObject({ requestId: 'request', status: expected })
       expect(document.activeElement).toBe(expected === 'focused' ? guest : composer)
-      expect(plane.hasAttribute('inert')).toBe(expected === 'background')
+      expect(plane.hasAttribute('inert')).toBe(state === 'background')
     } finally {
       hook.unmount()
       plane.remove()

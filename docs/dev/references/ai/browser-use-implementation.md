@@ -46,13 +46,29 @@ retention has the same upstream identity dependency. P0/P1 are roadmap milestone
 | Element addressing | `ref` = `e<n>`, allocated monotonically per **GuestSession**, mapped to `backendNodeId` in main for the current document | Stable within a document, cheap to resolve, never leaks across a main-frame navigation |
 | Snapshot source | `Accessibility.getFullAXTree` + `DOMSnapshot.captureSnapshot`, serialised in main | Replaces the guest-side JS walker in `tools/snapshot.ts`; works without a preload |
 | Snapshot output | Diff against the previous snapshot of the same tab by default; `full: true` opts out | Cost is in the tokens, not the CDP call |
-| Input execution | Real `Input.*` events with a JS fallback when the hit-test says the point is occluded | What every mature project converged on |
+| Input execution | CDP mouse events and managed-tab keyboard input; borrowed-guest keyboard events use `webContents.sendInputEvent` | Guest-owned keyboard delivery preserves the host composer; covered clicks retain the existing JS fallback |
 | WebMCP integration | Native CDP tools for managed and Agent-bound guests (§5.7) | Protocol types do not prove runtime support; do not replace a page API or bundle an unverified polyfill |
 | CDP surface | Explicit allow-list in `cdpAllowList.ts`; `GuestSession.send()` rejects anything else | Reviewable security boundary; `execute` stays the escape hatch |
 | Session ownership | Registry keyed by `webContents.id`; every session is `managed` (engine-created hidden tab) or `borrowed` (someone else's page, debugger only); owners acquire/release; retention marks per managed tab | Per-connection controllers are the leak |
 | Existing tools | `open`, `execute`, `screenshot`, `list_tabs`, `switch_tab`, `close_tab`, `reset` keep their names and input schemas; `snapshot` keeps its name but changes output | No prompt churn for the tools that already work |
 
 ## 2. Module layout
+
+Borrowed keyboard actions retain the renderer readiness acknowledgement and
+main-process owner checks, but do not call renderer `webview.focus()`. `type`
+focuses its target inside the guest, verifies that target, sends guest-owned
+character events and verifies the resulting value without replay. CRLF is
+normalized to LF; Electron character events use CR for line breaks, with no
+Enter keydown unless submission was explicitly requested. Single-line controls
+reject multiline text before editing. Standalone managed tabs retain CDP input.
+
+An isolated Windows/Electron `44.9.3` fixture reproduced CDP text entering the
+host textarea. The final keyboard-action bundle passed replacement, append and
+Backspace checks for input, textarea and contenteditable in ordinary and inert
+panes; host text, caret and DOM focus stayed unchanged. Unicode and multiline
+text were included. This hidden-window result does not establish macOS/Linux,
+IME-composition or installed-app behavior; Electron's documented parent-window
+focus prerequisite remains the cross-platform support boundary.
 
 Layout through PR3, with later additions marked by their work packages. PR A contains
 the service, main-only contracts, session and snapshot modules; PR B adds `actions/` and `mcp/`.

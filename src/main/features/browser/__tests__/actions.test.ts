@@ -41,6 +41,7 @@ beforeEach(() => {
     commands.push({ method, params })
     if (method === 'Page.getFrameTree') return { frameTree: { frame: { id: 'main', loaderId: 'doc' } } }
     if (method === 'DOM.resolveNode') return { object: { objectId: params.backendNodeId === 1 ? 'target' : 'hit' } }
+    if (method === 'DOM.focus') (target as HTMLElement).focus()
     if (method === 'DOM.getContentQuads') return { quads }
     if (method === 'Page.getLayoutMetrics') return { cssLayoutViewport: { pageX: 0, pageY: 0 } }
     if (method === 'DOM.getNodeForLocation') return { backendNodeId: hit === target ? 1 : 2 }
@@ -261,6 +262,80 @@ describe('Browser actions', () => {
     const events = commands.filter((c) => c.method === 'Input.dispatchKeyEvent').map((c) => c.params)
     expect(events.map((event) => event.type)).toEqual(['rawKeyDown', 'keyUp'])
     expect(events[0]).toMatchObject({ key: '+', code: 'Equal', windowsVirtualKeyCode: 187, modifiers: 2 })
+  })
+
+  describe('borrowed guest keyboard routing', () => {
+    beforeEach(() => {
+      const guest = session.guest
+      session.dispose()
+      session = new GuestSession(guest, 'borrowed')
+      vi.spyOn(session, 'resolveRef').mockReturnValue(1)
+      target = dom.window.document.querySelector('input')!
+      mock.sendInputEvent.mockImplementation((event) => {
+        const input = target as HTMLInputElement
+        if (event.type === 'keyDown' && event.keyCode === 'Backspace') input.value = ''
+        if (event.type === 'char' && !rejectFirstInput) input.value += event.keyCode
+      })
+    })
+
+    it('replaces and appends Unicode text only through the guest, retaining the managed CDP path separately', async () => {
+      await typeText(session, 'e1', 'ä中🧪', true, false, {})
+      await typeText(session, 'e1', '!', false, false, {})
+      expect((target as HTMLInputElement).value).toBe('ä中🧪!')
+      expect(
+        commands.filter(({ method }) => method === 'Input.insertText' || method === 'Input.dispatchKeyEvent')
+      ).toEqual([])
+    })
+
+    it('never replays a rejected guest insertion or submits line breaks into a single-line field', async () => {
+      rejectFirstInput = true
+      await expect(typeText(session, 'e1', 'new', true, true, {})).rejects.toThrow('not_found')
+      expect(
+        mock.sendInputEvent.mock.calls.filter(([event]) => event.type === 'char').map(([event]) => event.keyCode)
+      ).toEqual(['n', 'e', 'w'])
+      mock.sendInputEvent.mockClear()
+      await expect(typeText(session, 'e1', 'a\nb', true, false, {})).rejects.toThrow('not_allowed')
+      expect(mock.sendInputEvent).not.toHaveBeenCalled()
+    })
+
+    it('rejects a target whose page redirects focus before typing', async () => {
+      target.addEventListener('focus', () => dom.window.document.querySelector('button')!.focus())
+      await expect(typeText(session, 'e1', 'new', true, false, {})).rejects.toThrow('not_found')
+      expect(mock.sendInputEvent).not.toHaveBeenCalled()
+      expect((target as HTMLInputElement).value).toBe('old')
+    })
+
+    it('stops before guest input when ownership acknowledgement cancels the operation', async () => {
+      const controller = new AbortController()
+      await expect(
+        pressKey(session, 'x', {
+          signal: controller.signal,
+          focusInput: async () => controller.abort(new Error('cancelled'))
+        })
+      ).rejects.toThrow('cancelled')
+      expect(mock.sendInputEvent).not.toHaveBeenCalled()
+    })
+
+    it('releases a pressed key even when cancellation arrives immediately after keydown', async () => {
+      const controller = new AbortController()
+      mock.sendInputEvent.mockImplementation((event) => {
+        if (event.type === 'keyDown') controller.abort(new Error('cancelled'))
+      })
+      await expect(pressKey(session, 'Enter', { signal: controller.signal })).rejects.toThrow('cancelled')
+      expect(mock.sendInputEvent.mock.calls.map(([event]) => event.type)).toEqual(['keyDown', 'keyUp'])
+    })
+
+    it('stops the rest of a string if a page handler moves focus after the first character', async () => {
+      mock.sendInputEvent.mockImplementation((event) => {
+        if (event.type === 'char') {
+          ;(target as HTMLInputElement).value += event.keyCode
+          dom.window.document.querySelector('button')!.focus()
+        }
+      })
+      await expect(typeText(session, 'e1', 'new', false, false, {})).rejects.toThrow('not_found')
+      expect((target as HTMLInputElement).value).toBe('oldn')
+      expect(mock.sendInputEvent.mock.calls.filter(([event]) => event.type === 'char')).toHaveLength(1)
+    })
   })
 
   it('holds the operation until navigation loads and interrupts the wait for a dialog', async () => {
