@@ -16,7 +16,9 @@ Tricade 分叉仓库尚未保护 `main`。继承的 Dependabot 配置只检查 G
 
 启用漏洞警报和 Dependabot 安全更新。GitHub 当前的 [pnpm 支持文档](https://docs.github.com/en/code-security/reference/supply-chain-security/supported-ecosystems-and-repositories#pnpm)说明，版本更新支持 pnpm 12，但依赖关系图无法识别其双文档锁文件。本仓库固定使用 pnpm 12.6.0，并采用该格式。安全修复合并后，从默认分支导出的 SBOM 仅包含 233 条包记录，并遗漏已知传递依赖，尽管 GitHub 将原有 54 条警报标记为已修复。该状态不能证明覆盖完整。
 
-保留现有可用锁文件，使用固定版本包管理器的原生 `pnpm sbom --lockfile-only --sbom-format cyclonedx` 导出。将其 [CycloneDX 1.7](https://cyclonedx.org/docs/1.7/json/) 项目依赖图转换为 [GitHub 依赖提交 API](https://docs.github.com/en/rest/dependency-graph/dependency-submission?apiVersion=2026-03-10) 格式。保留所有导出的包与依赖边，包括平台专用可选依赖，并保留原始包 URL 和版本。拒绝空清单、缺失包 URL、缺失图记录和未解析引用。排除应用根节点；仅在 GitHub 的 PURL 标识合并包时合并 peer 上下文的依赖边。不猜测运行时或开发用途，也不将补丁编码为新版本。
+保留现有可用锁文件，使用固定版本包管理器的原生 `pnpm sbom --lockfile-only --sbom-format cyclonedx --split` 导出。将其 [CycloneDX 1.7](https://cyclonedx.org/docs/1.7/json/) 依赖图转换为 [GitHub 依赖提交 API](https://docs.github.com/en/rest/dependency-graph/dependency-submission?apiVersion=2026-03-10) 格式。保留所有导出的依赖组件及其依赖边，包括平台专用可选依赖，并保留原始包 URL 和版本。拒绝空清单、重复工作区、缺失包 URL、缺失图记录和在所属文档中无法解析的引用。在共享锁文件清单中，将每个 importer 的根节点依赖标记为直接依赖。如果其他图将工作区根节点列为依赖，则保留该根节点的出边；不为未被引用的项目根节点虚构依赖。仅在 GitHub 的 PURL 标识合并包时合并 peer 上下文的依赖边。不猜测运行时或开发用途，也不将补丁编码为新版本。
+
+对每个工作区分别执行原生导出，因为 pnpm 12.6.0 的合并导出可能因 importer 遍历顺序而将工作区依赖边归到应用根节点。Windows 和 Linux 的合并导出在包版本相同的情况下产生了不同的依赖边。[固定版本的 split 实现](https://github.com/pnpm/pnpm/blob/v12.6.0/pnpm/crates/cli/src/cli_args/sbom.rs)每次收集一个 importer；先登记所有依赖组件，再合并各图，避免文件顺序导致工作区根节点的依赖边丢失。这使用包管理器内置选择功能，无需添加自定义锁文件解析器。
 
 在 PR、main 推送和手动运行中，通过只读任务生成快照，不安装应用依赖或运行其脚本。仅为 main 推送或 main 手动运行设置独立任务并授予 `contents: write`；该任务下载同一次运行的产物，不执行检出的应用代码，验证 SHA、ref 和当前 main 提交后向 GitHub 提交。使用稳定的 detector/correlator，并要求 API 明确接受或成功。原生导出覆盖应用及工作区依赖图，不覆盖独立的 pnpm 引导可执行文件图或系统工具链。只有 GitHub 回读才能证明提交的图已建立索引。
 
@@ -42,6 +44,6 @@ Dependabot 可能需要人工协助调整版本专属补丁。CI 任务更名后
 - Regression — 配置检查确认全部 43 个带补丁的包名及 Electron 均排除在普通次版本和补丁更新组之外，而非被忽略。安全修复新增 `@mistralai/mistralai`、`deepmerge`、`glob`、`minimatch` 和 `zod`；minimatch 和 Zod 各有两个版本，使 43 个包名对应 45 个补丁版本键。每周计划将 npm 版本更新拉取请求限制为五个，GitHub Actions 限制为三个。
 - Regression — 固定版本 pnpm 12.6.0 的冻结锁文件安装、YAML 解析、限定文件格式检查、文档检查和差异空白检查均通过。已检查受影响验证计划；未针对本配置变更在本地执行其全套测试回退。
 - Regression — 未修改的 CI 任务已在提交 `a5c20d34f2234e9989311ceb62b9d98dc46ac6ef` 的手动基线运行 [41439838545](https://github.com/Tricade/cherry-studio/actions/runs/41439838545) 中成功完成。这证明了基线的实际执行，但不属于合格的 PR 检查。最终仍需在发布的提交上验证推送事件执行和合并资格。
-- Regression — 提交适配器的十个针对性用例保留传递依赖版本、可选平台包、直接依赖关系和 peer 上下文依赖边的并集；不完整清单会失败。实际固定版本的原生导出生成 2,920 个包节点，适配器保留 6,274 条非根节点依赖边，包括 Electron、旧版 Zod、deepmerge、glob 和 minimatch。工作流语法通过 actionlint 1.7.12。仅本地生成不能证明 GitHub 已接受快照或建立索引。
+- Regression — 提交适配器的十三个针对性用例保留传递依赖版本、可选平台包、直接依赖关系、不受文档顺序影响的工作区根节点依赖边，以及 peer 上下文依赖边的并集；不完整清单会失败。15 份原生 split 导出与锁文件的全部 importer 及其直接依赖数量一致，包括 ai-core 的 19 条和 system-speech 的五条。合并后得到 2,920 个依赖节点和 6,355 条包间依赖边，包括 Electron、旧版 Zod、deepmerge、glob 和 minimatch。工作流语法通过 actionlint 1.7.12。仅本地生成不能证明 GitHub 已接受快照或建立索引。
 
 GitHub 调度和索引仍属于服务行为。上传成功不代表没有漏洞；提交后应分别验证依赖图覆盖和警报状态。

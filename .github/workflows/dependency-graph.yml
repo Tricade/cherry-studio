@@ -29,13 +29,13 @@ jobs:
           run_install: false
       - name: Export the resolved project graph without installing dependencies
         run: |
-          pnpm sbom --lockfile-only --sbom-format cyclonedx --reporter silent --out "$RUNNER_TEMP/pnpm.cdx.json"
-          node scripts/dependencyGraph.mjs "$RUNNER_TEMP/pnpm.cdx.json" "$RUNNER_TEMP/snapshot.json"
+          pnpm sbom --lockfile-only --sbom-format cyclonedx --split --reporter silent --out "$RUNNER_TEMP/sbom/%s.cdx.json"
+          node scripts/dependencyGraph.mjs "$RUNNER_TEMP/sbom" "$RUNNER_TEMP/snapshot.json"
       - uses: actions/upload-artifact@v7
         with:
           name: dependency-graph
           path: |
-            ${{ runner.temp }}/pnpm.cdx.json
+            ${{ runner.temp }}/sbom/*.cdx.json
             ${{ runner.temp }}/snapshot.json
           if-no-files-found: error
           retention-days: 14

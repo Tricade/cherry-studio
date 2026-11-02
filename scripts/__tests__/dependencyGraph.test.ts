@@ -33,8 +33,31 @@ function projectBom() {
 }
 
 describe('dependency graph submission', () => {
+  it('retains workspace root edges regardless of document order and marks each importer dependency as direct', () => {
+    const application = projectBom()
+    application.dependencies[1].dependsOn = []
+    const workspace = projectBom()
+    workspace.metadata.component = { 'bom-ref': 'workspace', purl: 'pkg:npm/%40mistralai/mistralai@1.11.0' }
+    workspace.components.shift()
+    workspace.dependencies = [
+      { ref: 'workspace', dependsOn: ['validator', 'windows', 'linux'] },
+      ...workspace.dependencies.slice(2)
+    ]
+
+    const snapshot = createDependencySnapshot([workspace, application], context)
+    expect(createDependencySnapshot([application, workspace], context)).toEqual(snapshot)
+    const packages = snapshot.manifests['pnpm-lock.yaml'].resolved
+    expect(Object.keys(packages)).toHaveLength(4)
+    expect(packages['pkg:npm/%40mistralai/mistralai@1.11.0'].dependencies).toEqual([
+      'pkg:npm/%40esbuild/linux-x64@0.25.0',
+      'pkg:npm/%40esbuild/win32-x64@0.25.0',
+      'pkg:npm/zod@3.25.76'
+    ])
+    expect(packages['pkg:npm/zod@3.25.76'].relationship).toBe('direct')
+  })
+
   it('keeps transitive versions and every optional platform while excluding the application itself', () => {
-    const snapshot = createDependencySnapshot(projectBom(), context)
+    const snapshot = createDependencySnapshot([projectBom()], context)
     const packages = snapshot.manifests['pnpm-lock.yaml'].resolved
     expect(Object.keys(packages)).toHaveLength(4)
     expect(packages['pkg:npm/cherry-studio@2.1.10']).toBeUndefined()
@@ -60,7 +83,7 @@ describe('dependency graph submission', () => {
     bom.components.push({ 'bom-ref': 'sdk-peer', purl: 'pkg:npm/%40mistralai/mistralai@1.11.0' })
     bom.dependencies[1].dependsOn = ['validator', 'sdk-peer']
     bom.dependencies.push({ ref: 'sdk-peer', dependsOn: ['windows', 'linux'] })
-    const packages = createDependencySnapshot(bom, context).manifests['pnpm-lock.yaml'].resolved
+    const packages = createDependencySnapshot([bom], context).manifests['pnpm-lock.yaml'].resolved
     expect(Object.keys(packages)).toHaveLength(4)
     expect(packages['pkg:npm/%40mistralai/mistralai@1.11.0'].relationship).toBe('direct')
     expect(packages['pkg:npm/%40mistralai/mistralai@1.11.0'].dependencies).toEqual([
@@ -81,12 +104,34 @@ describe('dependency graph submission', () => {
       if (failure === 'duplicate-component') bom.components.push(bom.components[1])
       if (failure === 'duplicate-record') bom.dependencies.push(bom.dependencies[1])
       if (failure === 'empty') bom.components = []
-      expect(() => createDependencySnapshot(bom, context)).toThrow()
+      expect(() => createDependencySnapshot([bom], context)).toThrow()
     }
   )
 
   it('rejects an unsupported exporter schema and missing commit identity', () => {
-    expect(() => createDependencySnapshot({ ...projectBom(), specVersion: '2.0' }, context)).toThrow()
-    expect(() => createDependencySnapshot(projectBom(), { ...context, sha: '' })).toThrow()
+    expect(() => createDependencySnapshot([{ ...projectBom(), specVersion: '2.0' }], context)).toThrow()
+    expect(() => createDependencySnapshot([projectBom()], { ...context, sha: '' })).toThrow()
+  })
+
+  it('rejects duplicate workspaces and references missing from their own document', () => {
+    expect(() => createDependencySnapshot([projectBom(), projectBom()], context)).toThrow('Duplicate workspace')
+    const workspace = projectBom()
+    workspace.metadata.component = { 'bom-ref': 'workspace', purl: 'pkg:npm/workspace@1.0.0' }
+    workspace.dependencies[0].ref = 'workspace'
+    workspace.components.pop()
+    workspace.dependencies.pop()
+    expect(() => createDependencySnapshot([projectBom(), workspace], context)).toThrow('Unknown child: linux')
+  })
+
+  it('permits a workspace without dependencies but rejects an entirely empty inventory', () => {
+    const empty = projectBom()
+    empty.components = []
+    empty.dependencies = [{ ref: 'project', dependsOn: [] }]
+    empty.metadata.component.purl = 'pkg:npm/empty@1.0.0'
+    expect(createDependencySnapshot([empty, projectBom()], context)).toEqual(
+      createDependencySnapshot([projectBom()], context)
+    )
+    expect(() => createDependencySnapshot([empty], context)).toThrow('empty dependency inventory')
+    expect(() => createDependencySnapshot([], context)).toThrow('empty workspace inventory')
   })
 })
