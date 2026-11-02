@@ -67,6 +67,7 @@ import {
   AnthropicModelsResponseSchema,
   CopilotModelsResponseSchema,
   GeminiModelsResponseSchema,
+  LiteLLMModelGroupsResponseSchema,
   LMStudioModelsResponseSchema,
   NewApiModelsResponseSchema,
   OllamaShowResponseSchema,
@@ -954,8 +955,17 @@ const openAIFetcher: ModelFetcher = {
     return listing(
       dedup(response.data, (m) => m.id)
         .filter((m) => isSupportedOpenAIModel(m.id))
-        .map((m) => toModel(m.id, provider, { ownedBy: m.owned_by }))
+        .map((m) => toModel(m.id, provider, { ownedBy: m.owned_by, ...openAIModelLimits(m) }))
     )
+  }
+}
+
+function openAIModelLimits(
+  model: Pick<OpenAIModelResponseItem, 'max_input_tokens' | 'max_output_tokens'>
+): Partial<Model> {
+  return {
+    ...(model.max_input_tokens !== undefined ? { maxInputTokens: model.max_input_tokens } : {}),
+    ...(model.max_output_tokens !== undefined ? { maxOutputTokens: model.max_output_tokens } : {})
   }
 }
 
@@ -975,10 +985,64 @@ async function listOpenAICompatibleModels(
     dedup(response.data, (m) => m.id).map((m) =>
       toModel(m.id, provider, {
         name: m.name || m.id,
-        ownedBy: m.owned_by
+        ownedBy: m.owned_by,
+        ...openAIModelLimits(m),
+        ...(m.mode === 'embedding'
+          ? { endpointTypes: [ENDPOINT_TYPE.OPENAI_EMBEDDINGS], capabilities: [MODEL_CAPABILITY.EMBEDDING] }
+          : {})
       })
     )
   )
+}
+
+const liteLLMFetcher: ModelFetcher = {
+  match: (provider) => matchesPreset(provider, SystemProviderIds.litellm),
+  fetch: async (provider, signal) => {
+    const baseUrl = formatApiHost(getBaseUrl(provider))
+    const result = await listOpenAICompatibleModels(provider, baseUrl, signal)
+    if (result.models.length === 0) return result
+
+    try {
+      const timeout = AbortSignal.timeout(5_000)
+      const response = await getFromApi({
+        url: `${withoutTrailingApiVersion(baseUrl)}/model_group/info`,
+        headers: defaultHeaders(provider),
+        responseSchema: LiteLLMModelGroupsResponseSchema,
+        abortSignal: signal ? AbortSignal.any([signal, timeout]) : timeout
+      })
+      const groups = new Map(
+        dedup(response.data, (group) => group.model_group).map((group) => [group.model_group, group])
+      )
+      return {
+        ...result,
+        models: result.models.map((model) => {
+          const group = model.apiModelId ? groups.get(model.apiModelId) : undefined
+          if (!group) return model
+          const capabilities = [...(model.capabilities ?? [])]
+          if (group.supports_vision === true) capabilities.push(MODEL_CAPABILITY.IMAGE_RECOGNITION)
+          if (group.supports_function_calling === true) capabilities.push(MODEL_CAPABILITY.FUNCTION_CALL)
+          if (group.supports_reasoning === true) capabilities.push(MODEL_CAPABILITY.REASONING)
+          // False group defaults mean unknown; parameter names do not prove deployment capabilities.
+          return {
+            ...openAIModelLimits(group),
+            ...model,
+            capabilities: [...new Set(capabilities)],
+            ...(group.mode === 'embedding' && !model.endpointTypes?.length
+              ? { endpointTypes: [ENDPOINT_TYPE.OPENAI_EMBEDDINGS], capabilities: [MODEL_CAPABILITY.EMBEDDING] }
+              : {}),
+            ...(group.supports_vision === true ? { inputModalities: [MODALITY.TEXT, MODALITY.IMAGE] } : {})
+          }
+        })
+      }
+    } catch (error) {
+      if (signal?.aborted) throw error
+      logger.warn('LiteLLM model group metadata unavailable; retaining model listing', {
+        providerId: provider.id,
+        errorType: getErrorType(error)
+      })
+      return result
+    }
+  }
 }
 
 function resolvePoeChatEndpointTypes(
@@ -1212,6 +1276,7 @@ const fetchers: ModelFetcher[] = [
   anthropicFetcher,
   jinaFetcher,
   huggingFaceFetcher,
+  liteLLMFetcher,
   openAIFetcher,
   poeFetcher,
   openAICompatibleFetcher // always-match fallback, must be last

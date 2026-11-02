@@ -487,7 +487,7 @@
     },
     {
       "path": "docs/dev/references/provider-model/provider-registry.md",
-      "sources": ["packages/provider-registry","src/main/data/db/seeding","src/main/data/services/ModelService.ts","src/main/data/services/ProviderRegistryService.ts"]
+      "sources": ["packages/provider-registry","src/main/ai/provider/listModels.ts","src/main/ai/provider/listModelsSchemas.ts","src/main/data/db/seeding","src/main/data/services/ModelService.ts","src/main/data/services/ProviderRegistryService.ts","src/renderer/pages/settings/ProviderSettings/utils/modelSync.ts"]
     },
     {
       "path": "docs/dev/references/provider-model/README.md",

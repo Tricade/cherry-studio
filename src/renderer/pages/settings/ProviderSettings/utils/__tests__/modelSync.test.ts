@@ -1,7 +1,7 @@
 import { mockRendererLoggerService } from '@test-mocks/RendererLoggerService'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { ENDPOINT_TYPE, MODEL_CAPABILITY } from '@shared/data/types/model'
+import { ENDPOINT_TYPE, MODALITY, MODEL_CAPABILITY } from '@shared/data/types/model'
 
 import { fetchResolvedProviderModels, resolveCreateModelEndpointTypes, toCreateModelDto } from '../modelSync'
 
@@ -27,6 +27,51 @@ beforeEach(() => {
 })
 
 describe('fetchResolvedProviderModels', () => {
+  it('preserves discovered limits through registry enrichment and the create DTO', async () => {
+    const row = { id: 'litellm::local', providerId: 'litellm', apiModelId: 'local', name: 'Local' }
+    listModelsMock.mockResolvedValueOnce({
+      models: [{ ...row, maxInputTokens: 262_144, maxOutputTokens: 65_536 }]
+    })
+    dataApiGetMock.mockResolvedValueOnce([
+      { ...row, contextWindow: 200_000, maxInputTokens: 128_000, maxOutputTokens: 8_192 }
+    ])
+    const { models } = await fetchResolvedProviderModels('litellm')
+    const dto = toCreateModelDto('litellm', models[0])
+    expect(dto).toMatchObject({ contextWindow: 200_000, maxInputTokens: 262_144, maxOutputTokens: 65_536 })
+  })
+
+  it('keeps positive provider capabilities and modalities alongside registry fallback', async () => {
+    const row = { id: 'litellm::local', providerId: 'litellm', apiModelId: 'local', name: 'Local' }
+    listModelsMock.mockResolvedValueOnce({
+      models: [
+        {
+          ...row,
+          capabilities: [MODEL_CAPABILITY.IMAGE_RECOGNITION],
+          inputModalities: [MODALITY.TEXT, MODALITY.IMAGE],
+          maxInputTokens: 32_768
+        }
+      ]
+    })
+    dataApiGetMock.mockResolvedValueOnce([
+      { ...row, capabilities: [MODEL_CAPABILITY.FUNCTION_CALL], inputModalities: [MODALITY.TEXT] }
+    ])
+    const { models } = await fetchResolvedProviderModels('litellm')
+    expect(toCreateModelDto('litellm', models[0])).toMatchObject({
+      capabilities: [MODEL_CAPABILITY.FUNCTION_CALL, MODEL_CAPABILITY.IMAGE_RECOGNITION],
+      inputModalities: [MODALITY.TEXT, MODALITY.IMAGE],
+      maxInputTokens: 32_768
+    })
+    expect(toCreateModelDto('litellm', models[0])).not.toHaveProperty('contextWindow')
+    expect(toCreateModelDto('litellm', models[0])).not.toHaveProperty('maxOutputTokens')
+  })
+
+  it('prefers an actual discovered context window to a registry default', async () => {
+    const row = { id: 'ollama::local', providerId: 'ollama', apiModelId: 'local', name: 'Local' }
+    listModelsMock.mockResolvedValueOnce({ models: [{ ...row, contextWindow: 16_384 }] })
+    dataApiGetMock.mockResolvedValueOnce([{ ...row, contextWindow: 128_000 }])
+    expect((await fetchResolvedProviderModels('ollama')).models[0].contextWindow).toBe(16_384)
+  })
+
   it('throws when upstream model listing fails instead of returning an empty list', async () => {
     const apiKey = 'sk-should-not-reach-logs'
     const loggerErrorSpy = vi.spyOn(mockRendererLoggerService, 'error').mockImplementation(() => {})

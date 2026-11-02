@@ -19,6 +19,12 @@ uses `providerId:apiModelId`; the gateway resolves the configured Cherry model. 
 headers associate provider calls with the active Agent input. The internal listener works independently
 of the externally exposed gateway setting.
 
+The desktop model injection preserves a declared output limit instead of falling back to 8192.
+For its runtime context boundary it uses the smaller positive declared context/input limit,
+or the existing 256000 fallback when neither is known. This does not write an inferred
+window into the model record. Pi 1.4.0 itself clamps each output request to estimated remaining
+context with 4096 tokens of safety room; Cherry does not add a second token estimator.
+
 Pi's session retry policy owns retry decisions. The native HTTP client and gateway do not add
 retries. Cherry keeps native retries before output, then temporarily disables automatic replay
 after the first nonempty text/reasoning chunk or started tool. A subsequent transport failure
