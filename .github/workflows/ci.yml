@@ -276,6 +276,8 @@ jobs:
         env:
           VALIDATION_PLAN: ${{ needs.changes.outputs.plan }}
         run: pnpm check --group platform
+      - name: Dependency glob compatibility
+        run: pnpm test:scripts scripts/__tests__/dependencyGlobbing.test.ts scripts/__tests__/dependencySecurity.test.ts
 
   general-test:
     runs-on: ubuntu-latest

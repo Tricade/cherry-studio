@@ -28,7 +28,10 @@ updates:
           - "@earendil-works/pi-agent-core"
           - "@earendil-works/pi-ai"
           - "@earendil-works/pi-coding-agent"
+          - "@electron/asar"
           - "@elysia/node"
+          - "@eslint/config-array"
+          - "@eslint/eslintrc"
           - "@mistralai/mistralai"
           - "@napi-rs/system-ocr"
           - "@openrouter/ai-sdk-provider"
@@ -40,13 +43,17 @@ updates:
           - "@tiptap/markdown"
           - ai
           - app-builder-lib
+          - archiver-utils
           - atomically
           - bonjour-service
           - dingtalk-stream
+          - dir-compare
           - docx-preview
           - electron
           - electron-updater
           - emoji-picker-react
+          - eslint
+          - eslint-plugin-import-x
           - file-stream-rotator
           - glob
           - minimatch
@@ -55,6 +62,7 @@ updates:
           - onnxruntime-node
           - ppu-paddle-ocr
           - rtf.js
+          - rimraf
           - sherpa-onnx-node
           - streamdown
           - tesseract.js

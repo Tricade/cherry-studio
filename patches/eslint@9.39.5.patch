@@ -1,0 +1,13 @@
+diff --git a/lib/cli-engine/file-enumerator.js b/lib/cli-engine/file-enumerator.js
+index 91c4013c99..f677cf15c3 100644
+--- a/lib/cli-engine/file-enumerator.js
++++ b/lib/cli-engine/file-enumerator.js
+@@ -50,7 +50,7 @@ const debug = require("debug")("eslint:file-enumerator");
+ // Helpers
+ //------------------------------------------------------------------------------
+ 
+-const minimatchOpts = { dot: true, matchBase: true };
++const minimatchOpts = { dot: true, matchBase: true, windowsPathsNoEscape: process.platform === "win32" };
+ const dotfilesPattern = /(?:^\.|[/\\]\.)[^/\\.].*/u;
+ const NONE = 0;
+ const IGNORED_SILENTLY = 1;

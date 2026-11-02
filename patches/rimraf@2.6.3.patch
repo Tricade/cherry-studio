@@ -1,0 +1,43 @@
+diff --git a/rimraf.js b/rimraf.js
+index e80dd10693f8f6f9608eb9125d9cf41bdbb4bbd6..f244d11652e95ea7428382d034c8b3a9c0158e17 100644
+--- a/rimraf.js
++++ b/rimraf.js
+@@ -38,7 +38,11 @@ function defaults (options) {
+     options.disableGlob = true
+   }
+   options.disableGlob = options.disableGlob || false
+-  options.glob = options.glob || defaultGlobOpts
++  options.glob = Object.assign({}, options.glob || defaultGlobOpts, {
++    nocase: !!(options.glob && options.glob.nocase),
++    magicalBraces: true,
++    windowsPathsNoEscape: isWindows
++  })
+ }
+ 
+ function rimraf (p, options, cb) {
+@@ -59,14 +63,14 @@ function rimraf (p, options, cb) {
+   var errState = null
+   var n = 0
+ 
+-  if (options.disableGlob || !glob.hasMagic(p))
++  if (options.disableGlob || !glob.hasMagic(p, options.glob))
+     return afterGlob(null, [p])
+ 
+   options.lstat(p, function (er, stat) {
+     if (!er)
+       return afterGlob(null, [p])
+ 
+-    glob(p, options.glob, afterGlob)
++    glob.glob(p, options.glob).then(results => afterGlob(null, results), afterGlob)
+   })
+ 
+   function next (er) {
+@@ -270,7 +274,7 @@ function rimrafSync (p, options) {
+ 
+   var results
+ 
+-  if (options.disableGlob || !glob.hasMagic(p)) {
++  if (options.disableGlob || !glob.hasMagic(p, options.glob)) {
+     results = [p]
+   } else {
+     try {

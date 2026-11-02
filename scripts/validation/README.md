@@ -55,6 +55,8 @@ run after an earlier group fails. Main/preload retain
 three Linux shards; renderer retains five. Selected package tests run once in their
 own job. macOS/Windows retain the platform-gated test inventory (including
 system speech); platform selection is deliberately conservative whenever main is selected.
+The same platform jobs also run the explicit dependency glob compatibility and security
+suites, covering native Windows paths, packaging, cleanup and lint matching on macOS and Windows.
 
 The required `basic-checks`, `general-test`, and `render-test` names remain stable.
 Their verifier requires classification to succeed, checks every planned job, and
