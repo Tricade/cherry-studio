@@ -12,13 +12,15 @@ Rendering diagrams and link icons can contact remote services without a separate
 
 Keep diagram rendering and decorative link icons local. Remove credentials, queries and fragments from model-facing browser URL metadata, including relative link destinations; retain actual navigation and element references. This does not promise to redact arbitrary page content or secrets embedded in URL paths.
 
+Use the MIT `@plantuml/core` npm engine pinned to `1.2026.9` with bundled themes, emoji, icons and Viz. Run it in a local sandboxed HTML asset with a restrictive CSP, disabled external resource loaders and sanitized offline SVG output. External includes and downloaded standard libraries are unsupported; no remote rendering fallback is allowed.
+
 Prepare diagnostics locally from explicitly selected categories, show the exact prepared archive contents and destination, and require confirmation before uploading that same archive. Make scheduled update checks switchable with an accurate disclosure of request metadata and region lookup. Show backup contents, credentials, destination, archive protection and remote transmission alongside manual and scheduled controls.
 
 Add read-only provider quota reports to Usage, keeping token analytics separate. Show provider-reported used percentages, windows, resets, model or shared-bucket scope, and available credit or voucher information. Included subscription consumption has zero additional usage cost; paid extra usage remains separate. Missing data is unavailable, never estimated from tokens. Read only the selected account or verified matching account; never redeem credits or expand login permissions.
 
 Add projects containing reusable agent memberships, instructions, a workspace and shared knowledge bases. Sessions belong to at most one project. Project sessions use only the project's explicitly selected knowledge scope; an agent's global knowledge bindings are not copied into a project. Existing non-project sessions retain their behavior. Project membership does not imply autonomous orchestration.
 
-The fork owner authorized this implementation directly in the task conversation. This fork-specific authorization does not claim upstream Spec approval. The baseline is commit `61120d19e1af69c9bd9c93b5620143b448a1df0a`; Node `24.18.1`, pnpm `12.6.0`, Electron `44.9.3` and Claude Agent SDK `0.3.284` are pinned by the repository.
+The fork owner authorized this implementation directly in the task conversation. This fork-specific authorization does not claim upstream Spec approval. The initial baseline was `61120d19e1af69c9bd9c93b5620143b448a1df0a`; the fork and implementation were subsequently synchronized with upstream `4d1af48cdb68039c67bec71a05c0ce3190b1ebde`. Node `24.18.1`, pnpm `12.6.0`, Electron `44.9.3` and Claude Agent SDK `0.3.284` are pinned by the repository.
 
 ## Alternatives considered
 

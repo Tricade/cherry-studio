@@ -3181,6 +3181,7 @@
   "preview.pan_left": "Déplacement vers la gauche",
   "preview.pan_right": "Décalage vers la droite",
   "preview.pan_up": "Déplacer vers le haut",
+  "preview.plantuml.local_error": "Le rendu local du diagramme a échoué. Les inclusions et images externes sont désactivées. {{reason}}",
   "preview.previous": "Image précédente",
   "preview.reset": "Réinitialiser",
   "preview.rotate_left": "Rotation vers la gauche",

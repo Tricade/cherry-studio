@@ -3181,6 +3181,7 @@
   "preview.pan_left": "เลื่อนซ้าย",
   "preview.pan_right": "เลื่อนขวา",
   "preview.pan_up": "เลื่อนขึ้น",
+  "preview.plantuml.local_error": "ไม่สามารถแสดงผลแผนภาพในเครื่องได้ การรวมไฟล์และรูปภาพจากภายนอกถูกปิดใช้งาน {{reason}}",
   "preview.previous": "รูปภาพก่อนหน้า",
   "preview.reset": "รีเซ็ต",
   "preview.rotate_left": "หมุนซ้าย",

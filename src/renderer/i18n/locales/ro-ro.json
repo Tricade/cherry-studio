@@ -3181,6 +3181,7 @@
   "preview.pan_left": "Deplasează stânga",
   "preview.pan_right": "Deplasează dreapta",
   "preview.pan_up": "Deplasează sus",
+  "preview.plantuml.local_error": "Randarea locală a diagramei a eșuat. Includerile și imaginile externe sunt dezactivate. {{reason}}",
   "preview.previous": "Imaginea anterioară",
   "preview.reset": "Resetează",
   "preview.rotate_left": "Rotire la stânga",

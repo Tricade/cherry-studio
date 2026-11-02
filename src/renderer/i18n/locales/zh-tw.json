@@ -3181,6 +3181,7 @@
   "preview.pan_left": "左移",
   "preview.pan_right": "右移",
   "preview.pan_up": "上移",
+  "preview.plantuml.local_error": "本機圖表算繪失敗。已停用外部檔案引用和圖片。{{reason}}",
   "preview.previous": "上一張圖片",
   "preview.reset": "重設",
   "preview.rotate_left": "向左旋轉",

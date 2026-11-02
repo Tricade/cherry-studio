@@ -3181,6 +3181,7 @@
   "preview.pan_left": "Nach links",
   "preview.pan_right": "Nach rechts",
   "preview.pan_up": "Nach oben",
+  "preview.plantuml.local_error": "Das Diagramm konnte nicht lokal gerendert werden. Externe Includes und Bilder sind deaktiviert. {{reason}}",
   "preview.previous": "Vorheriges Bild",
   "preview.reset": "Zurücksetzen",
   "preview.rotate_left": "Nach links drehen",

@@ -3181,6 +3181,7 @@
   "preview.pan_left": "Sola Kaydır",
   "preview.pan_right": "Sağa Kaydır",
   "preview.pan_up": "Yukarı Kaydır",
+  "preview.plantuml.local_error": "Diyagram yerel olarak oluşturulamadı. Harici dosya eklemeleri ve görseller devre dışı. {{reason}}",
   "preview.previous": "Önceki Görsel",
   "preview.reset": "Sıfırla",
   "preview.rotate_left": "Sola Döndür",

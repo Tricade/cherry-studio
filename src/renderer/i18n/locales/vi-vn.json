@@ -3181,6 +3181,7 @@
   "preview.pan_left": "Di chuyển sang trái",
   "preview.pan_right": "Quay sang phải",
   "preview.pan_up": "Quay lên",
+  "preview.plantuml.local_error": "Không thể kết xuất sơ đồ cục bộ. Việc nạp tệp và hình ảnh bên ngoài đã bị tắt. {{reason}}",
   "preview.previous": "Ảnh Trước",
   "preview.reset": "Đặt lại",
   "preview.rotate_left": "Xoay Trái",

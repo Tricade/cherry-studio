@@ -3181,6 +3181,7 @@
   "preview.pan_left": "Pan Left",
   "preview.pan_right": "Pan Right",
   "preview.pan_up": "Pan Up",
+  "preview.plantuml.local_error": "Local diagram rendering failed. External includes and images are disabled. {{reason}}",
   "preview.previous": "Previous Image",
   "preview.reset": "Reset",
   "preview.rotate_left": "Rotate Left",

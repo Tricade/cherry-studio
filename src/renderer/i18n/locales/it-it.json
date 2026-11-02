@@ -3181,6 +3181,7 @@
   "preview.pan_left": "Sposta a sinistra",
   "preview.pan_right": "Sposta a destra",
   "preview.pan_up": "Sposta in alto",
+  "preview.plantuml.local_error": "Impossibile renderizzare il diagramma localmente. Le inclusioni e le immagini esterne sono disabilitate. {{reason}}",
   "preview.previous": "Immagine precedente",
   "preview.reset": "Reimposta",
   "preview.rotate_left": "Ruota a sinistra",

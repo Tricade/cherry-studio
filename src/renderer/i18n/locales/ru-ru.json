@@ -3181,6 +3181,7 @@
   "preview.pan_left": "Переместить влево",
   "preview.pan_right": "Переместить вправо",
   "preview.pan_up": "Переместить вверх",
+  "preview.plantuml.local_error": "Не удалось построить диаграмму локально. Подключение внешних файлов и изображений отключено. {{reason}}",
   "preview.previous": "Предыдущее изображение",
   "preview.reset": "Сбросить",
   "preview.rotate_left": "Повернуть влево",

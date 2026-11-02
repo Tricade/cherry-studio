@@ -3181,6 +3181,7 @@
   "preview.pan_left": "左にパン",
   "preview.pan_right": "右にパン",
   "preview.pan_up": "上にパン",
+  "preview.plantuml.local_error": "図をローカルで描画できませんでした。外部ファイルの読み込みと外部画像は無効になっています。{{reason}}",
   "preview.previous": "前の画像",
   "preview.reset": "リセット",
   "preview.rotate_left": "左回転",

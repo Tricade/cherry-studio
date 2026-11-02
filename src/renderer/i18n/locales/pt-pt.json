@@ -3181,6 +3181,7 @@
   "preview.pan_left": "Deslocar para a esquerda",
   "preview.pan_right": "Deslocar para a direita",
   "preview.pan_up": "Mover para cima",
+  "preview.plantuml.local_error": "Não foi possível renderizar o diagrama localmente. As inclusões e imagens externas estão desativadas. {{reason}}",
   "preview.previous": "Imagem Anterior",
   "preview.reset": "repor",
   "preview.rotate_left": "Rodar para a Esquerda",

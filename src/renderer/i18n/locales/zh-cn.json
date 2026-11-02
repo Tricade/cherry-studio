@@ -3181,6 +3181,7 @@
   "preview.pan_left": "左移",
   "preview.pan_right": "右移",
   "preview.pan_up": "上移",
+  "preview.plantuml.local_error": "本地图表渲染失败。已禁用外部文件引用和图片。{{reason}}",
   "preview.previous": "上一张图片",
   "preview.reset": "重置",
   "preview.rotate_left": "向左旋转",
