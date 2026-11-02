@@ -748,6 +748,9 @@ importers:
       '@pierre/highlights':
         specifier: 0.2.0
         version: 0.2.0
+      '@plantuml/core':
+        specifier: 1.2026.9
+        version: 1.2026.9
       '@playwright/test':
         specifier: ^1.62.1
         version: 1.62.1
@@ -5685,6 +5688,9 @@ packages:
         optional: true
       shiki:
         optional: true
+
+  '@plantuml/core@1.2026.9':
+    resolution: {integrity: sha512-Qy46og9hEb+wOFtjUfniWkl/BDwHpDuebQX5rF+35s9PS2G4cKZf1iWw4E/ELLQ0pTkESPDoQTbKWcc3ZyVcVA==}
 
   '@playwright/test@1.62.1':
     resolution: {integrity: sha512-DTcUc8qii+cpHvtOwggMtBRMjKZHXYWdw8syRYu2vtzuq4Wxphqq4NfCs5Zt44L6mA8rfDfj+PHnxFc/FeK6mQ==}
@@ -19532,6 +19538,8 @@ snapshots:
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
       shiki: 4.5.0
+
+  '@plantuml/core@1.2026.9': {}
 
   '@playwright/test@1.62.1':
     dependencies:
