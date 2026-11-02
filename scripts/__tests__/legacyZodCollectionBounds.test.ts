@@ -1,6 +1,4 @@
 import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
-import { pathToFileURL } from 'node:url'
 
 import { beforeAll, describe, expect, it } from 'vitest'
 import type * as LegacyZodModule from 'zod/v3'
@@ -9,11 +7,7 @@ type LegacyZod = typeof LegacyZodModule
 type Schema = LegacyZodModule.ZodTypeAny
 
 const rootRequire = createRequire(import.meta.url)
-const mistralRequire = createRequire(import.meta.resolve('@mistralai/mistralai'))
-const mistralZodEntry = pathToFileURL(join(dirname(mistralRequire.resolve('zod/package.json')), 'index.js')).href
 const distributions = [
-  { name: 'Mistral Zod 3 CJS', load: async () => mistralRequire('zod') as LegacyZod },
-  { name: 'Mistral Zod 3 ESM', load: async () => (await import(mistralZodEntry)) as LegacyZod },
   { name: 'Zod 4 bundled v3 CJS', load: async () => rootRequire('zod/v3') as LegacyZod },
   { name: 'Zod 4 bundled v3 ESM', load: () => import('zod/v3') }
 ]

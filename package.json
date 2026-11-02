@@ -267,7 +267,7 @@
     "@iconify/react": "^6.0.2",
     "@j178/prek": "^0.3.4",
     "@lezer/highlight": "1.2.3",
-    "@mistralai/mistralai": "1.11.0",
+    "@mistralai/mistralai": "2.7.0",
     "@modelcontextprotocol/client": "2.3.0",
     "@modelcontextprotocol/core": "2.3.0",
     "@modelcontextprotocol/sdk": "1.32.2",
