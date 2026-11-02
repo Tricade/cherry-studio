@@ -4693,7 +4693,7 @@
   "settings.fetch.allow_private_network": "ローカルネットワークアドレスへのアクセスを許可",
   "settings.fetch.allow_private_network_tip": "Web 取得ツールが localhost やプライベートネットワークのアドレスにアクセスできるようにします。自分のマシンや LAN 上のサービスをモデルに読み取らせたくない場合はオフにしてください。",
   "settings.font_size.title": "メッセージのフォントサイズ",
-  "settings.general.auto_check_update.control": "このスイッチは自動確認を制御します。手動で確認したりリリースノートを開いたりした場合も、これらのリクエストが送信されます。手動確認では、利用可能なアップデートがダウンロードされる場合もあります。",
+  "settings.general.auto_check_update.control": "このスイッチは自動確認と自動ダウンロードを制御します。手動で確認したりリリースノートを開いたりした場合も、これらのリクエストは引き続き送信されます。自動確認がオフでも、手動確認によって利用可能なアップデートがダウンロードされることがあります。",
   "settings.general.auto_check_update.privacy": "アップデートの確認とリリースノートの表示では releases.cherry-ai.com に接続します。リクエストでは IP アドレスが公開され、永続的なインストール ID、アプリのバージョン、OS のバージョンとアーキテクチャ、エディション、地域が送信されます。地域の判定では api.ipinfo.io にも接続します。",
   "settings.general.auto_check_update.title": "自動更新",
   "settings.general.avatar.builtin": "内蔵アバター",

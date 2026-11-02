@@ -4693,7 +4693,7 @@
   "settings.fetch.allow_private_network": "Permitir o acesso a endereços da rede local",
   "settings.fetch.allow_private_network_tip": "Permite que as ferramentas de obtenção da web acedam a localhost e a endereços de rede privada. Desative se não quiser que os modelos leiam serviços no seu computador ou na sua LAN.",
   "settings.font_size.title": "Tamanho da fonte da mensagem",
-  "settings.general.auto_check_update.control": "Este interruptor controla as verificações automáticas. As verificações manuais e a abertura das notas de versão continuam a fazer estes pedidos. As verificações manuais também podem descarregar uma atualização disponível.",
+  "settings.general.auto_check_update.control": "Este interruptor controla as verificações e os descarregamentos automáticos. As verificações manuais e a abertura das notas de versão continuam a enviar estes pedidos. Uma verificação manual pode descarregar uma atualização disponível mesmo quando as verificações automáticas estão desativadas.",
   "settings.general.auto_check_update.privacy": "A verificação de atualizações e as notas de versão contactam releases.cherry-ai.com. Os pedidos expõem o seu endereço IP e enviam um ID de instalação persistente, a versão da aplicação, a versão e arquitetura do sistema operativo, a edição e a região. A deteção da região também contacta api.ipinfo.io.",
   "settings.general.auto_check_update.title": "Atualização automática",
   "settings.general.avatar.builtin": "Avatares embutidos",
