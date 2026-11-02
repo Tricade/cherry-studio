@@ -1,0 +1,42 @@
+diff --git a/file.js b/file.js
+index 98496886400acde52b68bc9f9c587e93ed90187d..5d52cd74ef29bf6b9e5bb48c20c8728aae5a6203 100644
+--- a/file.js
++++ b/file.js
+@@ -14,6 +14,7 @@ var union = require('lodash.union');
+ var isPlainObject = require('lodash.isplainobject');
+ 
+ var glob = require('glob');
++var braceExpand = require('minimatch').braceExpand;
+ 
+ var file = module.exports = {};
+ 
+@@ -59,10 +60,28 @@ file.expand = function(...args) {
+   var patterns = Array.isArray(args[0]) ? args[0] : args;
+   // Return empty set if there are no patterns or filepaths.
+   if (patterns.length === 0) { return []; }
++  var globOptions = Object.assign({}, options, {
++    nocase: !!options.nocase,
++    windowsPathsNoEscape: process.platform === 'win32'
++  });
+   // Return all matching filepaths.
+   var matches = processPatterns(patterns, function(pattern) {
+     // Find all matching files for this pattern.
+-    return glob.sync(pattern, options);
++    pattern = pattern.split(path.sep).join('/');
++    var patterns = options.nonull ? braceExpand(pattern, globOptions) : [pattern];
++    var found = patterns.flatMap(function(expanded) {
++      var walker = new glob.Glob(expanded, globOptions);
++      var files = walker.walkSync().map(function(filename) { return filename.split(path.sep).join('/'); });
++      if (files.length !== 0 || !options.nonull) { return files; }
++      if (options.ignore) {
++        var ignore = new glob.Ignore([].concat(options.ignore), globOptions, walker.scurry.cwd);
++        var candidate = walker.scurry.cwd.resolve(expanded);
++        if (ignore.ignored(candidate) || ignore.childrenIgnored(candidate)) { return []; }
++      }
++      return [expanded];
++    });
++    found = Array.from(new Set(found));
++    return options.nosort ? found : found.sort(function(a, b) { return a.localeCompare(b, 'en'); });
+   });
+   // Filter result set?
+   if (options.filter) {

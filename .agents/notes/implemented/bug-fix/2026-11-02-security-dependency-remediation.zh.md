@@ -29,16 +29,20 @@ Vitest 5.0.5 要求同一执行组中的项目使用相同的 `maxWorkers`。`ai
 
 Markdown 源码行定位测试使用多行段落填充，使序列化测试不启动无人管理的异步高亮 worker。Vitest 的 worker 模拟可能在 JSDOM 环境销毁后才投递响应。专门的高亮测试套件保留真实 worker 覆盖，并最多等待十秒获取初始语法输出，与其已有冷启动用例一致；重新安装依赖后，一秒默认等待曾超时。
 
-两个剩余发现继续使用本地补丁，等待其使用方迁移。Zod 捆绑的兼容 API 与 Mistral OCR 操作也保留针对性保护：
+依赖迁移后，Zod 捆绑的兼容 API 与 Mistral OCR 操作继续保留针对性保护：
 
 | 包 | 回移修复与运行时入口 |
 | --- | --- |
-| glob 13.0.6 | 在 CJS 和 ESM 中应用上游四处 `return cb()` 中止修复；包根入口指向现有非捆绑入口，因为默认压缩捆绑文件内含旧 walker |
-| minimatch 9.0.7 与 10.2.6 | 回移上游的优化器展开上限及二次复杂度去重截止条件；保留两种模块格式和使用方现有主版本 |
 | Zod 4.6.6 的 v3 兼容 API | 在访问元素前拒绝超过大小上限的数组/集合；覆盖源码、CJS 和 ESM，并保留已有大小诊断 |
 | Mistral SDK 2.7.0 OCR | 将独立 Zod 3 依赖迁移到 Zod 4.6.6；先以公开的提前中止 API 验证 HTTP 200/422 响应体，再正常解析有效输出；畸形输出仅产生一条诊断 |
 
-Minimatch 3/5 没有公告所述优化级别 2 预处理路径，但纯版本公告范围仍列出它们。Minimatch 9 保留原有公共类型；回移补丁不声明新的花括号展开 API。
+将 glob 7.2.3/13.0.6 替换为 [glob 14.0.3](https://github.com/isaacs/node-glob/tree/v14.0.3)，将 minimatch 3.1.5/5.1.8/9.0.7/10.2.6 替换为 [minimatch 11.0.4](https://github.com/isaacs/minimatch/tree/v11.0.4)。精确绑定父包版本的覆盖项将迁移限定在已检查的使用方；这些是真正发布的版本，并非改名的回移补丁。Node 24.18.1 满足两者的引擎要求。移除三个不再使用的 glob/minimatch 补丁文件。
+
+Glob 的 Promise API 替换 ASAR 对旧回调的 promisify 包装，并为两个旧 Rimraf 使用方桥接回调接口。这些旧使用方适配器在所有平台上默认保留大小写敏感匹配，并遵循显式 `nocase` 设置。ASAR 解析输入目录的绝对路径，默认以该源目录作为 glob 工作目录，使打包进程工作目录之外的文件夹时，相对忽略模式仍然生效；保留调用者显式提供的工作目录。保留 Windows 原生模式分隔符、归档顺序、解包过滤、目录链接后代过滤及相同前缀的兄弟目录。Rimraf 在异步和同步清理前识别仅含花括号的模式。ASAR 和归档展开适配器在花括号展开前规范化 Windows 原生分隔符，保留排序及 `nonull` 分支，并确保回退结果仍排除被忽略的路径和子树。归档展开适配器通过包扩展显式依赖 minimatch。其他过时的 Glob 7 选项不作为通用兼容 API 承诺。
+
+Minimatch 11 用匹配器 API 替换正则表达式构造。修补 ESLint 旧配置加载器和导入边界规则的两种模块格式，以及 ASAR、目录比较和 ESLint 旧文件枚举器。`@eslint/config-array` 0.21.2 的 ESM 入口改为导入具名 `Minimatch`；其 CommonJS 入口已使用该 API。仅为原 Minimatch 3 使用方保留 Windows 分隔符策略；实际安装的 Minimatch 5.1.8 已采用较新的转义默认行为。现代使用方保留命名 API。App-builder 的目录匹配使用仍保留的 `match(path, partial)`，并将模式集合中的非字符串元素视为通配部分，因此也支持 Minimatch 11 的 Matcher 对象。Dependabot 继续单独审查与版本绑定的补丁及覆盖项。
+
+[Glob 14 更新日志](https://github.com/isaacs/node-glob/blob/v14.0.3/changelog.md)说明了根路径忽略模式及匹配边界行为的变化。夹具运行真实使用方 API 及其使用的选项，不承诺所有历史 Glob 7 选项。pnpm 还将根 htmlparser2 从 10.0.0 去重到 html-to-text 已使用的 [10.1.0](https://github.com/fb55/htmlparser2/releases/tag/v10.1.0) 系列；该版本保持公共解析器 API，更新实体解码。CI 平台任务除原有平台测试外，还在 Windows 和 macOS 上显式执行依赖 glob 兼容及安全套件。
 
 移除 deepmerge 4.3.1 的所有依赖路径，而非继续保留其回移补丁。[html-to-text 10.0.1](https://github.com/html-to-text/node-html-to-text/blob/1c39d9885075836a7e45d0236c7a5541dede8e52/packages/html-to-text/CHANGELOG.md) 使用 deepmerge-ts 8（解析为 8.0.2），并支持仓库的 Node 运行时。保留现有语音选择器和格式化函数。SVG 生成器直接调用现有 SVGO 3.3.5 优化器及 SVGR 8.1.0 JSX 插件，再调用 [Prettier 3.8.1 的异步格式化 API](https://github.com/prettier/prettier/blob/3.8.1/website/versioned_docs/version-stable/api.md)，替换两个仍依赖 deepmerge 的包装插件。保留显式优化/格式化选项、嵌入 HTML 移除、viewBox/路径数据及每个实例独立的 React ID。移除不再使用的 deepmerge 补丁和 Dependabot 分组排除项。
 
@@ -53,7 +57,7 @@ UI 包已有的独立类型检查在基线生成器下也因 Markdown CSS 导入
 
 ## 影响
 
-Mistral 和 deepmerge 迁移后，纯版本审计以退出码 1 报告两条 glob/minimatch 中危记录。解析后的锁文件中已无独立 Zod 3.25.76、deepmerge 4.3.1 及其两个 SVGR 包装插件。剩余漏洞机制已有本地保护及测试，上游版本号保持不变。没有屏蔽任何公告，也不将审计报告为通过。
+三项迁移完成后，`pnpm audit --json` 以退出码 0 报告零条公告。解析后的应用依赖图不再包含独立 Zod 3.25.76、deepmerge 4.3.1、两个 SVGR 包装插件或旧 glob/minimatch 版本。没有屏蔽任何公告。包审计不能证明应用没有漏洞；GitHub 索引完整性及实时警报状态仍需在合并后单独读回验证。
 
 **移除 Zod 3 依赖，保留捆绑兼容解析器保护：** [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5) 报告的 Mistral 1.11.0 → Zod 3.25.76 路径已替换为 Mistral 2.7.0 → Zod 4.6.6。在原回移修复前，含 10,000 个无效元素的受约束数组在 Zod 3.25.76 和 Zod 4.6.6 的 `/v3` 路径上均产生 10,001 条错误，而已修复的 Zod 4 根入口仅产生一条。[官方修复](https://github.com/colinhacks/zod/commit/a0ebf970f2d752e5f58527cd2942ff48be4f46bd) 只修改 v4，[v3 后续问题](https://github.com/colinhacks/zod/issues/6653) 未提供已发布的修复版 v3。剩余兼容解析器保留已验证的提前拒绝机制，移除已不再使用的独立包补丁。
 
@@ -69,6 +73,8 @@ Cherry 的图像/文档处理器调用配置端点的 `ocr.process`。恶意或�
 
 ## 验证
 
+- Compatibility — `dependencyGlobbing.test.ts` 与 `dependencySecurity.test.ts` 的全部 44 项用例在 Windows 上通过：40 项使用方用例和四项安全用例。最终适配器修正前，扩展后的套件记录为 18 项失败、26 项通过。真实夹具覆盖归档字节/排序/解包/忽略、目录链接清单、异步/同步清理、含花括号及无匹配行为的归档展开、目录比较、ESLint 两种模块格式及导入规则、文件列表、目录遍历、app-builder 部分匹配、现代 glob 路径、Pi 模型范围和回环 WebDAV 过滤。新增回归用例覆盖默认大小写敏感匹配及显式 `nocase`、仅含花括号模式的清理、被忽略的已有/缺失路径及 `directory/**` 模式、花括号模式中的原生分隔符，以及两种 flat-config 模块格式。这是使用方兼容证据，不是安装包或完整应用测试。
+- Compatibility — 四个现有 htmlparser2 使用方套件（`htmlArtifact`、`HtmlPreviewFrame`、`useMetaDataParser` 和 UI-contract 的 `transform`）在 10.1.0 下共 67 项用例通过。最终适配器修正后，Node 和渲染器类型检查、限定范围的 lint/格式及 actionlint 检查通过；新增跨平台 CI 步骤仍需在发布的 PR 上实际执行。
 - Regression — `pnpm test:scripts scripts/__tests__/dependencySecurity.test.ts scripts/__tests__/dependencyCompatibility.test.ts`：Zod 错误数量有界、原型键保持惰性、glob 优化有界、中止后停止目录 I/O、CSV/ANSI 输出、原生 tar 提取及真实回环 HTTP 响应。
 - Compatibility — `packages/ui/scripts/__tests__/icons-generate.test.ts`、`src/renderer/services/voice/__tests__/readableText.test.ts` 和 `scripts/__tests__/dependencySecurity.test.ts`：移除 deepmerge 后，39 项用例全部通过。两个新增生成器用例在旧流水线下也通过；它们编译并渲染实际生成的组件，保留几何形状、可缩放尺寸和每个实例独立的渐变/裁剪/href 引用，同时移除嵌入 HTML。现有语音测试保留私密内容过滤、文本顺序、有意义的图像描述及分块限制。新的合并依赖使原型键保持惰性。添加 CSS 声明后，UI 和渲染器类型检查通过；基线 CSS 错误单独记录。
 - Regression — `pnpm test:scripts scripts/__tests__/mistralOcrValidation.test.ts`：十项用例覆盖畸形页面、嵌套图像和 HTTP 422 的提前停止、诊断上限、256 个有效页面、结构化 API 错误、无关操作的有效 union 响应，以及真实 SDK 的上传/签名 URL/删除传输，包括端点、认证和取消信号传播。移植保护前，SDK 2.7.0 访问全部 2,000 个无效元素，当时六项用例中四项失败；补丁后十项全部通过。

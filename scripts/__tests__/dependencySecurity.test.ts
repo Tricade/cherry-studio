@@ -8,7 +8,7 @@ import * as z from 'zod'
 
 const requireFrom = (parent: string) => createRequire(import.meta.resolve(parent))
 
-describe('backported dependency security fixes', () => {
+describe('dependency security fixes', () => {
   it('Zod rejects oversized bounded arrays before building per-element errors', () => {
     const result = z.array(z.string()).max(1).safeParse(Array(2000).fill(0))
     expect(result.success).toBe(false)

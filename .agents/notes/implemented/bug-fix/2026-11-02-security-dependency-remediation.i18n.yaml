@@ -1,5 +1,5 @@
 # Bilingual-pair consistency record (docs/dev/i18n/README.md).
 # After editing either side, update its counterpart and re-record with:
 #   pnpm docs:check-pairing --write .agents/notes/implemented/bug-fix/2026-11-02-security-dependency-remediation.md
-2026-11-02-security-dependency-remediation.md: 51fad883dafb589562f49e16f7f563efaa9a3a4e
-2026-11-02-security-dependency-remediation.zh.md: 718f0b86597e277648e6723aa796e155f56145bb
+2026-11-02-security-dependency-remediation.md: 181dd2d399397f52fed56d90e1ce5a4d56c07201
+2026-11-02-security-dependency-remediation.zh.md: 87e2432e2191aa41c8b640fc9b824eebee7a724f
