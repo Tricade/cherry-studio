@@ -37,6 +37,7 @@ import {
   readTextFileWithAutoEncoding,
   sanitizeFilename
 } from '@main/utils/legacyFile'
+import { extractPdfText } from '@main/utils/pdf'
 import type { FileMetadata } from '@shared/data/types/legacyFile'
 import type { AbsoluteFilePath } from '@shared/types/file'
 import { MB } from '@shared/utils/constants'
@@ -448,6 +449,9 @@ class FileStorage {
 
     if (documentExts.includes(fileExtension)) {
       try {
+        if (fileExtension === '.pdf') {
+          return await extractPdfText(await readFile(filePath))
+        }
         if (fileExtension === '.doc') {
           // Awaited, so a failure reaches the catch below like every other
           // document read here; returning the promise would settle it outside.
@@ -456,10 +460,8 @@ class FileStorage {
 
         // Delayed loading: officeparser (and the pdf stack it drags in) stays out of the boot path.
         const { default: officeParser } = await import('officeparser')
-        const data = await officeParser.parseOfficeAsync(filePath, {
-          tempFilesLocation: this.tempDir
-        })
-        return data
+        const document = await officeParser.parseOffice(filePath)
+        return document.toText()
       } catch (error) {
         logger.error('Failed to read document file:', error as Error)
         throw error

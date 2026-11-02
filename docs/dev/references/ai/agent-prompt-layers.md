@@ -22,12 +22,17 @@ Agent conversations combine several independently stored prompt sources. They ar
 |---:|---|---|---|
 | 1 | Platform and runtime safety constraints | Application and runtime code | Non-overridable runtime policy; materialized with the connection |
 | 2 | Agent System Prompt | `agent.instructions` in Agent configuration | Authoritative role, goals, capability scope, and behavioral constraints; applies from the next fresh model turn after save |
-| 3 | Workspace Instructions | `<workspace>/system.md` plus runtime-native `CLAUDE.md` / scoped `AGENTS.md` context | Workspace-local guidance; an explicit `system.md` replaces the runtime's native base, including when the file is empty |
-| 4 | Agent Persona | `<agent-data>/SOUL.md` | Persistent name, personality, tone, and communication style across workspaces |
+| 3 | Project instructions, when in a project | `agent_project.instructions` | Shared team guidance below the reusable Agent role; materialized on the next fresh turn after edits |
+| 4 | Workspace Instructions | `<workspace>/system.md` plus runtime-native `CLAUDE.md` / scoped `AGENTS.md` context | Workspace-local guidance; an explicit `system.md` replaces the runtime's native base, including when the file is empty |
+| 5 | Agent Persona | `<agent-data>/SOUL.md` | Persistent name, personality, tone, and communication style within the selected Agent storage scope |
 
 Lower-priority guidance still applies when it does not conflict with a higher-priority source. `USER.md`, `memory/FACT.md`, journal entries, and retrieved knowledge are context rather than behavioral authority. This hierarchy is injected only when `agent.instructions` resolves to non-blank content. Agents without a configured System Prompt retain the legacy role-discovery and role-bearing `SOUL.md` fallback instead of receiving a hierarchy that points to a missing authority source.
 
 The hierarchy is an explicit instruction contract provided to the model, not a deterministic enforcement or security boundary; application and runtime hooks independently enforce hard runtime and tool-safety constraints. Prompt composition still preserves existing workspace and `SOUL.md` content verbatim. This change does not structurally remove legacy role text, so resolving conflicts remains model-mediated rather than guaranteed.
+
+## Project context
+
+Project sessions use `Data/Projects/<projectId>/<agentId>` for identity and memory; ordinary sessions keep `Data/Agents/<agentId>`. Global identity and memory files are not copied into projects. Members share the project's workspace, instructions, and selected knowledge bases, while each member retains its own project memory. The project KB list is enforced by the runtime and knowledge tools, including for builtin agents; an empty list permits none. Project instructions are model guidance, not a filesystem sandbox. Explicit external tools and their user-configured permissions retain their existing access.
 
 ## System Prompt authoring
 

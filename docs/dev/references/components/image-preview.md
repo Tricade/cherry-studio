@@ -1,6 +1,7 @@
 ---
 description: Current Mermaid, PlantUML, SVG, and Graphviz preview pipeline with sanitized Shadow DOM rendering and shared controls
 sources:
+  - scripts/plantumlSandbox.ts
   - src/renderer/components/Preview
   - packages/ui/src/lib/mermaid
   - src/renderer/services/MermaidRenderService.ts
@@ -15,7 +16,7 @@ by `CodeBlockView`. The current language mapping is:
 | Code language | Component | Renderer |
 |---|---|---|
 | `mermaid` | `MermaidPreview` | Merman (Rust Mermaid compiled to WASM) through `@cherrystudio/ui/mermaid` |
-| `plantuml` | `PlantUmlPreview` | Remote `www.plantuml.com` SVG endpoint |
+| `plantuml` | `PlantUmlPreview` | Bundled `@plantuml/core` engine in an isolated local iframe |
 | `svg` | `SvgPreview` | Supplied SVG string |
 | `dot`, `graphviz` | `GraphvizPreview` | Lazily initialized `@viz-js/viz` instance |
 
@@ -110,10 +111,31 @@ the error.
 
 ### PlantUML
 
-`PlantUmlPreview` UTF-8 encodes and raw-deflates the diagram, applies PlantUML's
-custom base64 alphabet, and fetches SVG from the fixed public PlantUML server.
-It reports HTTP and network failures through the shared error state. There is no
-automatic retry, server selection, or server-health monitor.
+`PlantUmlPreview` renders with the MIT `@plantuml/core` npm distribution, pinned
+to `1.2026.9`, and the bundled Viz graph engine. No Java installation or remote
+PlantUML server is required. Themes, emoji and OpenIconic resources are bundled;
+external files, standard-library downloads and network images are disabled.
+Diagrams requiring those resources need to be rewritten using local syntax.
+
+`scripts/plantumlSandbox.ts` emits a self-contained HTML asset in production and
+serves the same asset during development. Its hash-authorized script runs in an
+iframe with `sandbox="allow-scripts"`, without same-origin access. Its own CSP
+blocks network connections and external scripts, fonts, styles and images. The
+parent window's CSP is unchanged. File and standard-library loader hooks reject
+resource requests as an additional boundary.
+
+Source is passed through a frame-bound `postMessage` exchange, not a URL. Only a
+response from that frame with the current request ID is accepted. The result
+passes a stricter offline SVG sanitizer before the shared Shadow DOM renderer:
+no scripts, links, image elements, animation, foreign HTML or external CSS URLs;
+local fragment references, geometry, labels and basic styling remain supported.
+The sanitized SVG is also the source used by copy and download controls.
+
+New renders and unmounts cancel the prior frame. Input is limited to 100,000
+characters and returned SVG to 8 MiB of characters. A missing response times out
+after 20 seconds when the renderer event loop is responsive; this is not a hard
+CPU deadline. Rendering errors use the shared error state and retain the last
+successful diagram. There is no network fallback.
 
 ### SVG
 
@@ -131,11 +153,17 @@ graph body as `graph`/`node`/`edge` statements, because Viz ignores its default
 attribute options for parsed nodes; colours the DOT source sets still win. The
 preview re-renders when the app theme changes.
 
-PlantUML keeps a white backing: its server output has fixed light colours.
+PlantUML keeps a white backing because its diagram colours are defined by the
+PlantUML source and theme, independently of the application theme.
 
 ## Verification
 
 ```bash
-pnpm test:renderer src/renderer/components/Preview
-pnpm test:renderer src/renderer/components/CodeBlockView
+pnpm test:renderer src/renderer/components/Preview/__tests__/localPlantuml.test.ts src/renderer/components/Preview/__tests__/PlantUmlPreview.test.tsx src/renderer/components/Preview/__tests__/utils.test.ts src/renderer/components/Preview/__tests__/useDebouncedRender.test.ts
 ```
+
+Unit tests cannot establish Chromium CSP behavior. Validate the built local HTML
+asset in the pinned Electron version with both main-window and quick-assistant
+CSPs, an isolated profile, network-request recording, local sequence/class/theme
+diagrams and attempted external includes/images. Development serving and an
+installed packaged application need their own runtime checks.

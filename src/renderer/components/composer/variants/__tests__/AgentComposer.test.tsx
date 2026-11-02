@@ -2,6 +2,7 @@ import { basename } from 'node:path'
 
 import { MockCacheUtils } from '@test-mocks/renderer/CacheService'
 import { MockUseCacheUtils } from '@test-mocks/renderer/useCache'
+import { MockUseDataApiUtils, mockUseQuery } from '@test-mocks/renderer/useDataApi'
 import { mockRendererLoggerService } from '@test-mocks/RendererLoggerService'
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { type ComponentProps, type ReactNode, useEffect, useRef } from 'react'
@@ -1307,6 +1308,64 @@ describe('AgentComposer', () => {
     )
 
     await waitFor(() => expect(mocks.speedControlProps?.fastMode).toBe(false))
+  })
+
+  it('keeps removed project members readable but refuses new messages until re-added', async () => {
+    const originalQuery = mockUseQuery.getMockImplementation()!
+    const project = {
+      id: 'project-1',
+      name: 'Website',
+      instructions: '',
+      workspaceId: 'workspace-1',
+      workspace: {
+        id: 'workspace-1',
+        name: 'Workspace',
+        path: '/workspace',
+        type: 'user' as const,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        orderKey: 'a0'
+      },
+      agentIds: [],
+      knowledgeBaseIds: [],
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z'
+    }
+    try {
+      MockUseDataApiUtils.mockQueryData('/agent-projects/:projectId', project)
+      const composer = (
+        <AgentComposer
+          agentId="agent-1"
+          sessionId="session-1"
+          sessionOverride={{ ...createControlledSession(), projectId: 'project-1' }}
+          sendMessage={mocks.sendMessage}
+          stop={mocks.stop}
+          isStreaming={false}
+        />
+      )
+      const { rerender } = render(composer)
+      act(() => mocks.surfaceProps?.onTextChange('hello'))
+      expect(screen.getByText('project.member_removed')).toBeInTheDocument()
+      expect(mocks.surfaceProps?.sendDisabled).toBe(true)
+      await mocks.surfaceProps?.onSendDraft({ text: 'hello', tokens: [] })
+      expect(mocks.sendMessage).not.toHaveBeenCalled()
+      MockUseDataApiUtils.mockQueryData('/agent-projects/:projectId', { ...project, agentIds: ['agent-1'] })
+      rerender(
+        <AgentComposer
+          agentId="agent-1"
+          sessionId="session-1"
+          sessionOverride={{ ...createControlledSession(), projectId: 'project-1' }}
+          sendMessage={mocks.sendMessage}
+          stop={mocks.stop}
+          isStreaming={false}
+        />
+      )
+      act(() => mocks.surfaceProps?.onTextChange('hello again'))
+      expect(screen.queryByText('project.member_removed')).not.toBeInTheDocument()
+      expect(mocks.surfaceProps?.sendDisabled).toBe(false)
+    } finally {
+      mockUseQuery.mockImplementation(originalQuery)
+    }
   })
 
   it('blocks the send button with a model-required prompt when the agent has no configured model', async () => {

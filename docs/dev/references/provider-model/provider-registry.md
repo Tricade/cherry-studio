@@ -4,6 +4,9 @@ sources:
   - packages/provider-registry
   - src/main/data/services/ProviderRegistryService.ts
   - src/main/data/services/ModelService.ts
+  - src/main/ai/provider/listModels.ts
+  - src/main/ai/provider/listModelsSchemas.ts
+  - src/renderer/pages/settings/ProviderSettings/utils/modelSync.ts
   - src/main/data/db/seeding
 ---
 
@@ -95,9 +98,23 @@ GET /providers/:providerId/models:resolve?ids=gpt-4o&ids=o3
         → mergePresetModel(preset, override, ...) or createCustomModel(...)
     → Return merged Model[]
 
-SDK only provides model IDs. All other data (capabilities, pricing, etc.)
-comes from the registry — SDK data does not overwrite curated registry data.
 ```
+
+Provider discovery supplies IDs and optional metadata; the registry fills missing facts.
+Valid discovered `contextWindow`, `maxInputTokens` and `maxOutputTokens` take priority over
+registry defaults during import and survive the create DTO. The three values stay separate:
+input and output limits are never added into a fictional context window. Invalid optional
+limits are ignored without discarding an otherwise valid model. Positive discovered
+capabilities augment the registry; custom model modalities are also persisted.
+
+OpenAI-compatible lists may report `max_input_tokens` and `max_output_tokens`. The LiteLLM
+preset additionally reads `/model_group/info` from the same configured server, with a five-second
+timeout and exact matching against listed model IDs. Missing permissions, unsupported endpoints
+and invalid metadata leave the basic list usable. Other presets and generic servers receive no
+LiteLLM probe. In LiteLLM 1.106.6 these values are group maxima, not a guarantee for every routed
+backend; false capability defaults and supported parameter names do not establish capabilities.
+Aliases without an exact group match retain unknown group facts rather than guessing a backend.
+Discovery does not update existing model rows or replace explicit user settings.
 
 ## Merge Functions
 
@@ -231,7 +248,7 @@ Implemented in `normalizeModelId()` (`packages/provider-registry/src/utils/norma
 | `presetModelId` | Links to models.json entry (null = custom model) |
 | `name` / `capabilities` / `supportsStreaming` | Required for custom rows; nullable preset deltas |
 | `inputModalities` / `outputModalities` | Complete custom config or nullable preset deltas |
-| `contextWindow` / `maxOutputTokens` | Complete custom config or nullable preset deltas |
+| `contextWindow` / `maxInputTokens` / `maxOutputTokens` | Complete custom config or nullable preset deltas |
 | `reasoning` | Custom-model intrinsic controls/token limits; preset rows resolve it from the registry |
 | `pricing` | Complete custom config or nullable preset delta |
 | `parameters` | Complete custom config or nullable preset delta |

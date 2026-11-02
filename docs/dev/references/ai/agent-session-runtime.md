@@ -55,6 +55,16 @@ driver internals behind the same host contract.
 | Usage capture | Each driver exposes provider-invocation capture according to its transport; gateway-backed calls use AiService middleware rather than a runtime aggregate. |
 | Runtime timing | `AiStreamManager` owns the message clock. Drivers contribute provider/tool timing when their SDK exposes it; approval waits are captured independently from approval request to decision/abort. |
 
+## Partial responses and transport retries
+
+Pi retains its native automatic retry policy until it emits nonempty text/reasoning or starts a tool. Cherry then disables automatic replay for the remainder of the prompt. A retryable transport error, including the SDK's HTTP/2 errors, finishes as an error with the existing output preserved; it does not append a regenerated answer to the same message. The previous in-memory retry setting returns after the prompt promise settles, preserving an already-disabled policy. Intermediate `agent_end` events must not restore it because Pi decides retries afterwards. Length/compaction recovery remains owned by Pi, and explicit user continuation remains available. This policy does not change the normal Chat Chromium transport or claim to repair an upstream HTTP/2 connection.
+
+## Project conversations
+
+`AgentProjectService` owns SQLite project definitions, reusable Agent memberships and selected knowledge bases. A conversation may carry an immutable optional `projectId`; creating one requires a current member and the project's registered user workspace. Ordinary empty-session reuse excludes project sessions. The Projects display mode groups conversations and opens the project editor, where a user chooses an existing member to start a chat. Adding members does not launch an autonomous workflow.
+
+Both runtime drivers capture project instructions and knowledge scope in connection rebuild facts. Project identity and memory use `Data/Projects/<projectId>/<agentId>` without copying global files. Project KB bindings form a strict ceiling, including an empty list and builtin agents. Live knowledge tools recheck that scope; removed members cannot start another turn. Existing messages remain readable. Project follow-ups queue for a fresh turn instead of steering an active turn, so changed instructions reconcile before use. These context rules do not replace explicit filesystem or external-tool permissions.
+
 ## Heartbeat execution deadline
 
 In the agent's heartbeat settings, **Maximum Execution Time (minutes)** controls
@@ -271,6 +281,8 @@ the trusted calling Agent/Session. A same-Agent Session continues the sender's w
 cross-Agent Session continues the target Agent's most recent workspace, falling back to the
 sender's workspace when that Agent has no Session. The model is not a tool argument because
 Sessions use their owning Agent's model.
+
+For project callers, `session_create` instead retains the sender's `projectId` and project workspace, and the target must be a current member of that project. The membership and session creation checks happen in the same database transaction. This restriction does not change the existing explicit `session_send` permission contract.
 
 ### Deliberate security ceiling
 

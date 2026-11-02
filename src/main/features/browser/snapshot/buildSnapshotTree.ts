@@ -98,7 +98,7 @@ export function buildSnapshotTree(
             ? sanitizeSnapshotUrl(`https:${href}`).replace(/^https:/, '')
             : URL.canParse(href)
               ? sanitizeSnapshotUrl(href)
-              : href
+              : href.split(/[?#]/, 1)[0]
           props.push(`href=${text(safeHref)}`)
         }
         const value = password || !raw.dom ? undefined : text(node.value?.value, 80) || undefined

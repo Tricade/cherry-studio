@@ -18,8 +18,8 @@ import { createCherryToolsServer } from '@main/ai/mcp/servers/cherryBuiltinTools
 import { createDoctorServer } from '@main/ai/mcp/servers/doctor'
 import { createMcpManagerServer } from '@main/ai/mcp/servers/mcpManager'
 import { createSkillsServer } from '@main/ai/mcp/servers/skills'
+import { getAgentProjectContext, resolveAgentProjectKnowledgeScope } from '@main/ai/runtime/agentProjectContext'
 import { CHERRY_MCP_SERVER } from '@main/ai/toolApproval/builtinToolPolicy'
-import { resolveKnowledgeBaseScope } from '@main/ai/utils/knowledgeScope'
 import type { AgentChannelEntity } from '@shared/data/api/schemas/agentChannels'
 import type { AgentEntity } from '@shared/data/api/schemas/agents'
 import type { AgentSessionEntity } from '@shared/data/api/schemas/agentSessions'
@@ -123,9 +123,12 @@ export function buildAgentMcpServers(
         allowAnyOwnedNotifyChannel: notificationContext.allowAnyOwnedChannel,
         getKnowledgeAccess: () => {
           const liveAgent = agentService.getAgent(agent.id)
+          const project = getAgentProjectContext(session, agent.id)
           return {
-            allKnowledgeBases: resolveAgentCapabilities(liveAgent).allKnowledgeBases,
-            baseIds: liveAgent ? resolveKnowledgeBaseScope(liveAgent.knowledgeBaseIds, selectedKnowledgeBaseIds) : []
+            allKnowledgeBases: !project && resolveAgentCapabilities(liveAgent).allKnowledgeBases,
+            baseIds: liveAgent
+              ? resolveAgentProjectKnowledgeScope(project, liveAgent.knowledgeBaseIds, selectedKnowledgeBaseIds)
+              : []
           }
         }
       })

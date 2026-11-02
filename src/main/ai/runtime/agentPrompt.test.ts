@@ -78,6 +78,27 @@ describe('Agent prompt onboarding', () => {
     expect(append).not.toContain('**Discover the role**')
   })
 
+  it('adds project instructions below the reusable role and above workspace guidance', async () => {
+    const id = randomUUID()
+    const agentDataPath = await createAgentDataDirectory(root, id)
+    const agent = agentService.createAgentWithId(id, { type: 'pi', name: 'Coder', model, instructions: 'Review code.' })
+    const { append } = await buildAgentRuntimePrompt({
+      workspacePath,
+      agentDataPath,
+      agent,
+      project: {
+        id: 'project-one',
+        name: 'Website',
+        instructions: 'Use the team style guide.',
+        knowledgeBaseIds: []
+      }
+    })
+    expect(append).toContain('2. Agent System Prompt')
+    expect(append).toContain('3. Project instructions\n4. Workspace Instructions')
+    expect(append).toContain('<project_instructions>\nUse the team style guide.\n</project_instructions>')
+    expect(agentService.getAgent(id)?.instructions).toBe('Review code.')
+  })
+
   it('loads an established identity from Agent storage without restarting onboarding', async () => {
     const id = randomUUID()
     const agentDataPath = await createAgentDataDirectory(root, id)

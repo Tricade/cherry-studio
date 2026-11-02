@@ -51,6 +51,7 @@ export interface AgentWorkspaceReferences {
   sessions: AgentWorkspaceReferenceList
   channels: AgentWorkspaceReferenceList
   tasks: AgentWorkspaceReferenceList
+  projects?: AgentWorkspaceReferenceList
 }
 
 export type AgentWorkspaceSchemas = {

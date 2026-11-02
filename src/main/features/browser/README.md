@@ -138,7 +138,10 @@ restore its previous value after the last execution. Webview screenshots retain 
 subscription for the bounded CDP command, releasing it on completion, cancellation or timeout.
 
 Keyboard readiness is checked against the invocation's current conversation owner
-and exact guest binding before and after renderer acknowledgement. Inert retained
-guests acknowledge background execution without taking DOM focus or revealing the
-pane; visible guests must focus successfully. Missing guests, cancellation and
-ownership changes reject the input before CDP keyboard dispatch.
+and exact guest binding before and after renderer acknowledgement. Both visible
+and inert retained guests acknowledge readiness without moving the host's DOM
+focus or revealing the pane. Borrowed guests receive keyboard events directly via
+their own `webContents.sendInputEvent`; CDP keyboard input could otherwise reach
+the active host composer. Managed tabs retain their CDP path. Typing checks the
+guest target's focus and reads back its value; a failed borrowed insertion is
+never replayed. Missing guests, cancellation and ownership changes reject input.

@@ -314,6 +314,36 @@ describe('buildPiProviderInjection', () => {
     return { captures, result }
   }
 
+  it.each([
+    { contextWindow: undefined, maxInputTokens: 262_144, maxOutputTokens: 262_144, boundary: 262_144 },
+    { contextWindow: 16_384, maxInputTokens: 262_144, maxOutputTokens: 32_768, boundary: 16_384 },
+    { contextWindow: 262_144, maxInputTokens: 16_384, maxOutputTokens: 32_768, boundary: 16_384 }
+  ])('lets native Pi bound discovered output to context $boundary', async ({ boundary, ...limits }) => {
+    const injection = buildPiProviderInjection(
+      completionsProvider('https://fixture.invalid/v1'),
+      { ...reportedModel('local-reasoning'), ...limits },
+      REAL_KEY
+    )
+    const { captures, result } = await captureRequest(injection)
+    expect(result.stopReason).toBe('stop')
+    expect(captures).toHaveLength(1)
+    const cap = captures[0].body.max_completion_tokens ?? captures[0].body.max_tokens
+    expect(cap).toBeGreaterThan(8_192)
+    expect(cap).toBeLessThanOrEqual(boundary - 4_096)
+    expect(injection.providerConfig.models![0].maxTokens).toBe(limits.maxOutputTokens)
+  })
+
+  it('keeps an explicitly configured output cap in the native request', async () => {
+    const injection = buildPiProviderInjection(
+      completionsProvider('https://fixture.invalid/v1'),
+      { ...reportedModel('local-reasoning'), maxOutputTokens: 4_096 },
+      REAL_KEY
+    )
+    const { captures, result } = await captureRequest(injection)
+    expect(result.stopReason).toBe('stop')
+    expect(captures[0].body.max_completion_tokens ?? captures[0].body.max_tokens).toBe(4_096)
+  })
+
   it.each(['models/gemini-3.1-flash-lite', 'models/gemini-3.5-flash'])(
     'disables store for custom Google Completions model %s',
     (apiModelId) => {

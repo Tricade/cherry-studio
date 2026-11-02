@@ -216,6 +216,10 @@ driver orphan sweep and resume-token claims.
 
 ## Backup and shutdown
 
+Project CRUD belongs to `AgentProjectService`, not the lifecycle coordinator. Deleting a project requires removing all referencing sessions, including trash; deleting its registered workspace is also blocked while the project exists. Removing a member retains historical sessions and that member's project memory. No project operation deletes the user's shared workspace files.
+
+Orphan sweep also checks `Data/Projects/<projectId>/<agentId>`, retaining live project/Agent records and the existing freshness and restore safeguards. A deleted project's internal memory can be reclaimed after those safeguards pass. Full backups include this memory tree; slim backups omit it. Both retain project definitions and session history in SQLite, and neither implicitly includes an external workspace folder.
+
 BackupManager owns the whole-app snapshot and restore protocol. AgentLifecycleService
 owns the Agent-specific participants, using two stages:
 

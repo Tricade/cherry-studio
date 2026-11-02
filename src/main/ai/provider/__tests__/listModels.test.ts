@@ -267,6 +267,134 @@ describe('listModels — malformed OpenAI-compatible rows', () => {
   )
 })
 
+describe('listModels — provider token limits and LiteLLM metadata', () => {
+  const fetchMock = vi.fn<typeof fetch>()
+
+  beforeEach(async () => {
+    const actual = await vi.importActual<typeof AiSdkProviderUtils>('@ai-sdk/provider-utils')
+    fetchMock.mockReset()
+    aiSdkGetFromApiMock.mockImplementation((options) => actual.getFromApi({ ...options, fetch: fetchMock }))
+  })
+
+  function provider(presetProviderId?: 'litellm') {
+    return makeProvider({
+      id: 'custom-proxy',
+      presetProviderId,
+      defaultChatEndpoint: ENDPOINT_TYPE.OPENAI_CHAT_COMPLETIONS,
+      endpointConfigs: {
+        [ENDPOINT_TYPE.OPENAI_CHAT_COMPLETIONS]: { baseUrl: 'https://proxy.example/tenant/v1' }
+      },
+      settings: { extraHeaders: { 'X-Custom': 'preserved' } }
+    })
+  }
+
+  it('keeps independent valid limits, ignores invalid optional fields and makes no generic vendor probe', async () => {
+    fetchMock.mockResolvedValueOnce(
+      Response.json({
+        data: [
+          { id: 'valid', max_input_tokens: 262_144, max_output_tokens: 262_144 },
+          { id: 'partial', max_input_tokens: '32000', max_output_tokens: 16_384 },
+          { id: 'invalid', max_input_tokens: -1, max_output_tokens: 2.5 },
+          { id: 'null', max_input_tokens: null, max_output_tokens: null },
+          { id: 'unsafe', max_input_tokens: Number.MAX_SAFE_INTEGER + 1, max_output_tokens: 0 },
+          { id: 'embedding', mode: 'embedding', max_input_tokens: 8_192 },
+          { name: 'missing id' }
+        ]
+      })
+    )
+    const { models } = await listModels(provider(), undefined, { throwOnError: true })
+    expect(models).toHaveLength(6)
+    expect(models[0]).toMatchObject({ maxInputTokens: 262_144, maxOutputTokens: 262_144 })
+    expect(models[0]).not.toHaveProperty('contextWindow')
+    expect(models[1].maxInputTokens).toBeUndefined()
+    expect(models[1].maxOutputTokens).toBe(16_384)
+    for (const model of models.slice(2, 5)) {
+      expect(model.maxInputTokens).toBeUndefined()
+      expect(model.maxOutputTokens).toBeUndefined()
+    }
+    expect(models[5]).toMatchObject({
+      maxInputTokens: 8_192,
+      capabilities: [MODEL_CAPABILITY.EMBEDDING],
+      endpointTypes: [ENDPOINT_TYPE.OPENAI_EMBEDDINGS]
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('enriches only exact listed LiteLLM groups and keeps authoritative listing limits', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        Response.json({ data: [{ id: 'local-reasoning' }, { id: 'local-code', max_output_tokens: 32_768 }] })
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          data: [
+            {
+              model_group: 'local-reasoning',
+              max_input_tokens: 262_144,
+              max_output_tokens: 262_144,
+              supports_vision: true,
+              supports_function_calling: true,
+              supports_reasoning: true
+            },
+            {
+              model_group: 'local-code',
+              max_input_tokens: 131_072,
+              max_output_tokens: 262_144,
+              supports_vision: false,
+              supports_function_calling: false,
+              supports_reasoning: false,
+              supported_openai_params: ['tools', 'thinking', 'reasoning_effort']
+            },
+            { model_group: 'unlisted', max_input_tokens: 1_000_000 },
+            { model_group: 'LOCAL-REASONING', max_output_tokens: 1 },
+            null
+          ]
+        })
+      )
+    const { models } = await listModels(provider('litellm'), undefined, { throwOnError: true })
+    expect(models).toHaveLength(2)
+    expect(models[0]).toMatchObject({
+      apiModelId: 'local-reasoning',
+      maxInputTokens: 262_144,
+      maxOutputTokens: 262_144,
+      capabilities: [MODEL_CAPABILITY.IMAGE_RECOGNITION, MODEL_CAPABILITY.FUNCTION_CALL, MODEL_CAPABILITY.REASONING],
+      inputModalities: [MODALITY.TEXT, MODALITY.IMAGE]
+    })
+    expect(models[0]).not.toHaveProperty('contextWindow')
+    expect(models[1]).toMatchObject({ maxInputTokens: 131_072, maxOutputTokens: 32_768, capabilities: [] })
+    expect(models[1].inputModalities).toBeUndefined()
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      'https://proxy.example/tenant/v1/models',
+      'https://proxy.example/tenant/model_group/info'
+    ])
+    const headers = new Headers(fetchMock.mock.calls[1][1]?.headers)
+    expect(headers.get('authorization')).toBe('Bearer AIza-secret-key')
+    expect(headers.get('x-custom')).toBe('preserved')
+  })
+
+  it.each([403, 404, 200])('keeps basic listing when optional metadata is unavailable (%i)', async (status) => {
+    fetchMock
+      .mockResolvedValueOnce(Response.json({ data: [{ id: 'local', max_output_tokens: 16_384 }] }))
+      .mockResolvedValueOnce(Response.json({ error: { message: 'private-fixture-detail' } }, { status }))
+    const { models } = await listModels(provider('litellm'), undefined, { throwOnError: true })
+    expect(models).toHaveLength(1)
+    expect(models[0].maxOutputTokens).toBe(16_384)
+    expect(JSON.stringify(mockMainLoggerService.warn.mock.calls)).not.toContain('private-fixture-detail')
+  })
+
+  it('propagates a caller cancellation instead of treating it as missing metadata', async () => {
+    const controller = new AbortController()
+    fetchMock.mockResolvedValueOnce(Response.json({ data: [{ id: 'local' }] })).mockImplementationOnce((_url, init) => {
+      controller.abort()
+      expect(init?.signal?.aborted).toBe(true)
+      return Promise.reject(new DOMException('Cancelled', 'AbortError'))
+    })
+    await expect(listModels(provider('litellm'), controller.signal, { throwOnError: true })).rejects.toThrow(
+      'Cancelled'
+    )
+  })
+})
+
 describe('listModels — TokenDance protocol routing', () => {
   function makeTokenDanceProvider(id = 'tokendance') {
     return makeProvider({

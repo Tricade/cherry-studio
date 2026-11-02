@@ -23,6 +23,7 @@ import FeedbackDialog from '@renderer/components/feedback/FeedbackDialog'
 import LogoAvatar from '@renderer/components/icons/LogoAvatar'
 import {
   SettingGroup,
+  SettingHelpText,
   SettingRow,
   SettingRowTitle,
   SettingsContentColumn
@@ -261,9 +262,22 @@ const AboutSettings: FC = () => {
             <Divider className="my-3" />
             <SettingRow id="setting-about-auto-check-update" className="scroll-mt-6 gap-3">
               <SettingRowTitle>{t('settings.general.auto_check_update.title')}</SettingRowTitle>
-              <Switch checked={autoCheckUpdate} onCheckedChange={(v) => setAutoCheckUpdate(v)} />
+              <Switch
+                aria-label={t('settings.general.auto_check_update.title')}
+                aria-describedby="update-privacy-disclosure"
+                checked={autoCheckUpdate}
+                onCheckedChange={(v) => setAutoCheckUpdate(v)}
+              />
             </SettingRow>
+          </>
+        )}
+        <div id="update-privacy-disclosure" className="mt-2 space-y-2">
+          <SettingHelpText>{t('settings.general.auto_check_update.privacy')}</SettingHelpText>
+          {!isPortable && <SettingHelpText>{t('settings.general.auto_check_update.control')}</SettingHelpText>}
+        </div>
 
+        {!isPortable && (
+          <>
             <Divider className="my-3" />
             <SettingRow className="flex-nowrap gap-6">
               <div className="flex min-w-0 flex-1 items-center justify-between gap-6">

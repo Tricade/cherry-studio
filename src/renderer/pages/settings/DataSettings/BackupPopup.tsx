@@ -11,6 +11,7 @@ import {
   DialogTitle
 } from '@cherrystudio/ui'
 import { usePreference } from '@data/hooks/usePreference'
+import { BackupDisclosure } from '@renderer/components/BackupDisclosure'
 import { getBackupProgressLabelKey } from '@renderer/i18n/label'
 import { backup } from '@renderer/services/BackupService'
 import { createPopup, type PopupInjectedProps } from '@renderer/services/popup'
@@ -79,7 +80,6 @@ const PopupContainer: React.FC<Props> = ({ forceFullBackup = false, open, resolv
 
   const title = t('backup.title')
   const okText = t('backup.confirm.button')
-  const content = t('backup.content')
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onCancel()}>
@@ -90,7 +90,7 @@ const PopupContainer: React.FC<Props> = ({ forceFullBackup = false, open, resolv
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        {!progressData && <div>{content}</div>}
+        {!progressData && <BackupDisclosure target="export" forceFull={forceFullBackup} />}
         {progressData && (
           <div className="flex flex-col items-center gap-4 py-5 text-center">
             <CircularProgress

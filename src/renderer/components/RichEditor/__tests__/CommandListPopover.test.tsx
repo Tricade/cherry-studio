@@ -64,6 +64,12 @@ function createPopover(ref?: RefObject<CommandListPopoverRef | null>) {
       command={mocks.command}
       decorationNode={document.createElement('span')}
       clientRect={() => null}
+      placement="bottom-start"
+      offset={{ mainAxis: 4, crossAxis: 0 }}
+      flip
+      floatingUi={{ placement: 'bottom-start', strategy: 'absolute', middleware: [] }}
+      mount={() => () => {}}
+      loading={false}
     />
   )
 }

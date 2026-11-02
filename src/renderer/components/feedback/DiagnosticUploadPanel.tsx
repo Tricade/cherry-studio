@@ -14,16 +14,19 @@ import type { OutputFor } from '@shared/ipc/types'
 import {
   DIAGNOSTIC_DESCRIPTION_MAX_BYTES,
   DIAGNOSTIC_FEEDBACK_FORM_URL,
-  diagnosticDescriptionByteLength
+  diagnosticDescriptionByteLength,
+  normalizeDiagnosticDescription
 } from '@shared/utils/diagnostics'
 import { createFilePathHandle } from '@shared/utils/file'
 
+import { DiagnosticBundlePreview, type PreparedDiagnosticBundle } from './DiagnosticBundlePreview'
+import { DiagnosticSourceSelector, useDiagnosticSourceSelection } from './DiagnosticSourceSelector'
 import { DIAGNOSTIC_STATUS_TRANSLATION_KEYS } from './diagnosticStatusLabels'
 
 const logger = loggerService.withContext('DiagnosticUploadPanel')
 type UploadResult = Exclude<OutputFor<'diagnostics.bundle.upload'>, { status: 'busy' }>
 type SavedUploadResult = Extract<OutputFor<'diagnostics.bundle.save_upload'>, { status: 'saved' }>
-type OperationStatus = 'discarding' | 'idle' | 'saving' | 'submitting'
+type OperationStatus = 'discarding' | 'idle' | 'saving' | 'submitting' | 'preparing'
 
 function discardRetainedUpload(bundleId: string) {
   return ipcApi.request('diagnostics.bundle.discard_upload', { bundleId })
@@ -50,7 +53,8 @@ export const DiagnosticUploadPanel = function DiagnosticUploadPanel({
   const { t } = useTranslation()
   const uploadFormId = useId()
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false)
-  const [acknowledged, setAcknowledged] = useState(true)
+  const [acknowledged, setAcknowledged] = useState(false)
+  const [prepared, setPrepared] = useState<PreparedDiagnosticBundle | null>(null)
   const [operationStatus, setOperationStatus] = useState<OperationStatus>('idle')
   const [result, setResult] = useState<UploadResult | null>(null)
   const [savedUpload, setSavedUpload] = useState<SavedUploadResult | null>(null)
@@ -58,6 +62,20 @@ export const DiagnosticUploadPanel = function DiagnosticUploadPanel({
   const primaryActionRef = useRef<HTMLButtonElement>(null)
   const retainedBundleIdRef = useRef<string | null>(null)
   const mountedRef = useRef(true)
+  const revisionRef = useRef(0)
+  const invalidatePreview = useCallback(() => {
+    revisionRef.current += 1
+    setPrepared(null)
+    setAcknowledged(false)
+    const bundleId = retainedBundleIdRef.current
+    retainedBundleIdRef.current = null
+    setRetainedBundleId(null)
+    if (bundleId)
+      void discardRetainedUpload(bundleId).catch(() => logger.error('Failed to discard stale diagnostic preview'))
+  }, [])
+  const sourceSelection = useDiagnosticSourceSelection(invalidatePreview, false)
+
+  useEffect(() => invalidatePreview(), [description, invalidatePreview])
 
   useEffect(() => {
     mountedRef.current = true
@@ -76,13 +94,14 @@ export const DiagnosticUploadPanel = function DiagnosticUploadPanel({
     if (result) primaryActionRef.current?.focus()
   }, [result])
 
-  const normalizedDescription = description.trim()
+  const normalizedDescription = normalizeDiagnosticDescription(description.trim())
   const descriptionValid =
     normalizedDescription.length > 0 &&
     diagnosticDescriptionByteLength(normalizedDescription) <= DIAGNOSTIC_DESCRIPTION_MAX_BYTES
   const showDescriptionError = hasAttemptedSubmit && !descriptionValid
   const isBusy = operationStatus !== 'idle'
-  const canAttemptUpload = operationStatus === 'idle' && acknowledged
+  const canAttemptUpload =
+    operationStatus === 'idle' && acknowledged && prepared !== null && prepared.description === normalizedDescription
 
   useEffect(() => onBusyChange?.(isBusy), [isBusy, onBusyChange])
 
@@ -94,7 +113,39 @@ export const DiagnosticUploadPanel = function DiagnosticUploadPanel({
   )
 
   const changeDescription = (nextDescription: string) => {
+    invalidatePreview()
     onDescriptionChange(nextDescription)
+  }
+
+  const prepareBundle = async () => {
+    setHasAttemptedSubmit(true)
+    if (!descriptionValid || isBusy || !sourceSelection.isReady) return
+    const revision = revisionRef.current
+    setOperationStatus('preparing')
+    try {
+      const next = await ipcApi.request('diagnostics.bundle.prepare_upload', {
+        description: normalizedDescription,
+        includeChatRecords: sourceSelection.effectiveIncludeChatRecords,
+        includeLogs: sourceSelection.effectiveIncludeLogs,
+        includeTraces: sourceSelection.effectiveIncludeTraces,
+        range: sourceSelection.range
+      })
+      if (next.status === 'busy') {
+        toast.error(t('settings.about.diagnostics.errors.busy'))
+      } else if (!mountedRef.current || revisionRef.current !== revision) {
+        await discardRetainedUpload(next.bundleId)
+      } else {
+        retainedBundleIdRef.current = next.bundleId
+        setRetainedBundleId(next.bundleId)
+        setPrepared(next)
+        setAcknowledged(false)
+      }
+    } catch (error) {
+      logger.error('Failed to prepare diagnostic preview', error as Error)
+      toast.error(t('settings.about.diagnostics.preview.failed'))
+    } finally {
+      if (mountedRef.current) setOperationStatus('idle')
+    }
   }
 
   const requestClose = useCallback(async () => {
@@ -172,15 +223,12 @@ export const DiagnosticUploadPanel = function DiagnosticUploadPanel({
   }
 
   const uploadBundle = async () => {
-    if (!canAttemptUpload || !descriptionValid) return
+    if (!canAttemptUpload || !descriptionValid || !prepared) return
     setOperationStatus('submitting')
     try {
       const uploadResult = await ipcApi.request('diagnostics.bundle.upload', {
-        description: normalizedDescription,
-        includeChatRecords: true,
-        includeLogs: true,
-        includeTraces: true,
-        range: '24h'
+        bundleId: prepared.bundleId,
+        confirmed: true
       })
       acceptSubmissionResult(uploadResult)
     } catch (error) {
@@ -269,14 +317,17 @@ export const DiagnosticUploadPanel = function DiagnosticUploadPanel({
               ) : null}
             </section>
 
+            <DiagnosticSourceSelector disabled={isBusy} selection={sourceSelection} />
+            {prepared && <DiagnosticBundlePreview key={prepared.bundleId} bundle={prepared} />}
+
             <label className="flex cursor-pointer items-start gap-3 text-sm" htmlFor="diagnostic-acknowledgement">
               <Checkbox
                 id="diagnostic-acknowledgement"
                 checked={acknowledged}
-                disabled={isBusy}
+                disabled={isBusy || !prepared}
                 onCheckedChange={(checked) => setAcknowledged(checked === true)}
               />
-              <span>{t('settings.about.diagnostics.report.acknowledgement')}</span>
+              <span>{t('settings.about.diagnostics.preview.acknowledgement')}</span>
             </label>
           </form>
         )}
@@ -288,9 +339,11 @@ export const DiagnosticUploadPanel = function DiagnosticUploadPanel({
             {t(
               operationStatus === 'discarding'
                 ? 'common.loading'
-                : operationStatus === 'saving'
-                  ? 'settings.about.diagnostics.report.saving'
-                  : 'settings.about.diagnostics.report.submitting'
+                : operationStatus === 'preparing'
+                  ? 'settings.about.diagnostics.preview.preparing'
+                  : operationStatus === 'saving'
+                    ? 'settings.about.diagnostics.report.saving'
+                    : 'settings.about.diagnostics.report.submitting'
             )}
           </Button>
         ) : result ? (
@@ -322,6 +375,20 @@ export const DiagnosticUploadPanel = function DiagnosticUploadPanel({
             <Button variant="outline" onClick={() => void requestClose()}>
               {t('settings.about.diagnostics.actions.cancel')}
             </Button>
+            {!prepared && (
+              <Button
+                type="button"
+                variant="emphasis"
+                disabled={!sourceSelection.isReady}
+                onClick={() => void prepareBundle()}>
+                {t('settings.about.diagnostics.preview.prepare')}
+              </Button>
+            )}
+            {prepared && (
+              <Button type="button" variant="outline" onClick={invalidatePreview}>
+                {t('common.edit')}
+              </Button>
+            )}
             <Button type="submit" form={uploadFormId} variant="emphasis" disabled={!canAttemptUpload}>
               {t('settings.about.diagnostics.upload.actions.consent_upload')}
             </Button>

@@ -1,4 +1,4 @@
-import { Bot, Clock, Folder, History } from 'lucide-react'
+import { Bot, Clock, Folder, FolderKanban, History } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -6,15 +6,17 @@ import type { AgentSessionDisplayMode } from '@shared/data/preference/preference
 
 import { ConversationListOptionsMenu } from './ConversationListOptionsMenu'
 
-const SESSION_DISPLAY_OPTIONS: AgentSessionDisplayMode[] = ['time', 'workdir', 'agent']
+const SESSION_DISPLAY_OPTIONS: AgentSessionDisplayMode[] = ['time', 'project', 'workdir', 'agent']
 export const SESSION_DISPLAY_LABEL_KEYS: Record<AgentSessionDisplayMode, string> = {
   agent: 'agent.session.display.agent',
   time: 'agent.session.display.time',
+  project: 'project.title',
   workdir: 'agent.session.display.workdir'
 }
 const SESSION_DISPLAY_ICONS: Record<AgentSessionDisplayMode, ReactNode> = {
   agent: <Bot size={16} />,
   time: <Clock size={16} />,
+  project: <FolderKanban size={16} />,
   workdir: <Folder size={16} />
 }
 
@@ -24,6 +26,7 @@ type SessionListOptionsMenuProps = {
   mode: AgentSessionDisplayMode
   onChange: (mode: AgentSessionDisplayMode) => void
   onManageAgents?: () => void | Promise<void>
+  onManageProjects?: () => void
   onOpenHistoryRecords?: () => void
   sectionIds?: readonly string[]
 }
@@ -34,6 +37,7 @@ export function SessionListOptionsMenu({
   mode,
   onChange,
   onManageAgents,
+  onManageProjects,
   onOpenHistoryRecords,
   sectionIds
 }: SessionListOptionsMenuProps) {
@@ -76,6 +80,11 @@ export function SessionListOptionsMenu({
               label: t('agent.manage.title'),
               onSelect: onManageAgents
             }
+          : undefined
+      }
+      projectAction={
+        onManageProjects
+          ? { icon: <FolderKanban size={16} />, label: t('project.manage'), onSelect: onManageProjects }
           : undefined
       }
     />

@@ -1,7 +1,7 @@
 import type { BrowserActionOptions } from '../../BrowserCursor'
 import { BrowserSessionError } from '../../session/BrowserSessionError'
 import type { GuestSession } from '../../session/GuestSession'
-import { sanitizeSnapshotUrl } from '../../snapshot/serializeSnapshot'
+import { sanitizeSnapshotTitle, sanitizeSnapshotUrl } from '../../snapshot/serializeSnapshot'
 import type { BrowserController } from '../browserController'
 import { errorResponse, successResponse } from './utils'
 
@@ -52,7 +52,9 @@ export async function browserResult(
           ...(newTabId ? { newTabId } : {}),
           tabId,
           url: sanitizeSnapshotUrl(session.guest.isDestroyed() ? '' : session.guest.getURL()),
-          title: session.guest.isDestroyed() ? '' : session.guest.getTitle(),
+          title: session.guest.isDestroyed()
+            ? ''
+            : sanitizeSnapshotTitle(session.guest.getTitle(), session.guest.getURL()),
           ...(session.pendingDialog ? { dialog: session.pendingDialog } : {}),
           ...session.takeEvents(),
           ...controller.takeHostEvents?.(tabId),

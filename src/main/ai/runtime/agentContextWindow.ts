@@ -9,9 +9,10 @@ import type { Model } from '@shared/data/types/model'
 /** Decimal 256K: a model whose real window is 256K never overflows this boundary. */
 export const DEFAULT_AGENT_CONTEXT_WINDOW = 256_000
 
-/** The model's declared context window, or the default when it declares none. */
+/** Honor both declared limits conservatively at runtime without storing or summing an inferred window. */
 export function resolveAgentContextWindow(model: Model): number {
-  return typeof model.contextWindow === 'number' && Number.isFinite(model.contextWindow) && model.contextWindow > 0
-    ? model.contextWindow
-    : DEFAULT_AGENT_CONTEXT_WINDOW
+  const limits = [model.contextWindow, model.maxInputTokens].filter(
+    (limit): limit is number => typeof limit === 'number' && Number.isFinite(limit) && limit > 0
+  )
+  return limits.length > 0 ? Math.min(...limits) : DEFAULT_AGENT_CONTEXT_WINDOW
 }

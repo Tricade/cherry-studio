@@ -17,6 +17,7 @@ import {
   withResourceListGroupIdPrefix
 } from '@renderer/utils/chat/resourceListBase'
 import type { OrderRequest } from '@shared/data/api/schemas/_endpointHelpers'
+import type { AgentProjectEntity } from '@shared/data/api/schemas/agentProjects'
 import type { AgentSessionEntity } from '@shared/data/api/schemas/agentSessions'
 import type { AgentWorkspaceEntity } from '@shared/data/api/schemas/agentWorkspaces'
 import type { AgentSessionDisplayMode as PreferenceAgentSessionDisplayMode } from '@shared/data/preference/preferenceTypes'
@@ -29,6 +30,7 @@ export type SessionDisplayAgent = {
 }
 
 export type SessionDisplayGroupLabels = {
+  noProject?: string
   pinned: string
   time: Record<ResourceListTimeBucket, string>
   agent: {
@@ -40,6 +42,7 @@ export type SessionDisplayGroupLabels = {
 }
 
 export type SessionDisplayGroupOptions = {
+  projects?: readonly Pick<AgentProjectEntity, 'id' | 'name'>[]
   agentById?: ReadonlyMap<string, SessionDisplayAgent>
   labels: SessionDisplayGroupLabels
   mode: AgentSessionDisplayMode
@@ -49,6 +52,7 @@ export type SessionDisplayGroupOptions = {
 }
 
 export type SessionDisplaySortOptions = {
+  projects?: readonly Pick<AgentProjectEntity, 'id' | 'name'>[]
   agentRankById?: ReadonlyMap<string, number>
   mode: AgentSessionDisplayMode
   now?: Parameters<typeof getResourceTimeBucket>[1]
@@ -82,6 +86,9 @@ export const SESSION_PINNED_GROUP_ID = 'session:pinned'
 export const SESSION_PINNED_SECTION_ID = 'session:section:pinned'
 export const SESSION_AGENT_SECTION_ID = 'session:section:agent'
 export const SESSION_WORKDIR_SECTION_ID = 'session:section:workdir'
+export const SESSION_PROJECT_SECTION_ID = 'session:section:project'
+export const SESSION_UNASSIGNED_PROJECT_GROUP_ID = 'session:project:none'
+export const getSessionProjectGroupId = (id: string) => `session:project:${id}`
 export const SESSION_NO_PROJECT_GROUP_ID = 'session:no-project'
 export const SESSION_NO_PROJECT_SECTION_ID = 'session:section:no-project'
 export const SESSION_UNKNOWN_AGENT_GROUP_ID = 'session:agent:unknown'
@@ -272,7 +279,8 @@ export function createSessionDisplayGroupResolver<T extends SessionListItem>({
   mode,
   now,
   pinnedAsSection = false,
-  workdirDisplay
+  workdirDisplay,
+  projects = []
 }: SessionDisplayGroupOptions): ResourceListGroupResolver<T> {
   const pinnedGroupLabel = mode === 'time' || !pinnedAsSection ? labels.pinned : ''
   const pinnedResolver = createPinnedGroupResolver<T>({
@@ -308,6 +316,18 @@ export function createSessionDisplayGroupResolver<T extends SessionListItem>({
         return agent
           ? { id: `agent:${agent.id}`, label: agent.name }
           : { id: 'agent:unknown', label: labels.agent.unknown }
+      })
+    )
+  }
+
+  if (mode === 'project') {
+    const projectById = new Map(projects.map((project) => [project.id, project]))
+    return withSessionGroupIdPrefix(
+      composeResourceListGroupResolvers(pinnedResolver, (session) => {
+        const project = session.projectId ? projectById.get(session.projectId) : undefined
+        return project
+          ? { id: `project:${project.id}`, label: project.name }
+          : { id: 'project:none', label: labels.noProject ?? labels.workdir.none }
       })
     )
   }
@@ -351,6 +371,16 @@ export function sortSessionsForDisplayGroups<T extends SessionListItem>(
   options: SessionDisplaySortOptions
 ): T[] {
   const isPinned = (session: T) => session.pinned === true
+
+  if (options.mode === 'project') {
+    const ranks = new Map((options.projects ?? []).map((project, index) => [project.id, index + 1]))
+    return sortRankedResourceItems(sessions, {
+      getRank: (session) =>
+        isPinned(session) ? 0 : ((session.projectId ? ranks.get(session.projectId) : undefined) ?? UNKNOWN_GROUP_RANK),
+      isPinned,
+      compareWithinGroup: compareResourceRecency((session) => session.lastActivityAt)
+    })
+  }
 
   if (options.mode === 'time') {
     return sortRankedResourceItems(sessions, {
@@ -397,6 +427,7 @@ export function sortSessionsForDisplayGroups<T extends SessionListItem>(
 }
 
 export type SessionListViewOptions = {
+  projects?: readonly Pick<AgentProjectEntity, 'id' | 'name'>[]
   agentById: ReadonlyMap<string, SessionDisplayAgent>
   agentRankById: ReadonlyMap<string, number>
   labels: SessionDisplayGroupLabels
@@ -410,11 +441,11 @@ export type SessionListViewOptions = {
 /** Builds the list as displayed, so rendering and event handlers cannot disagree on order. */
 export function deriveSessionListView<T extends SessionListItem>(
   items: readonly T[],
-  { agentById, agentRankById, labels, mode, now, visibleAgentId, workspaces }: SessionListViewOptions,
+  { agentById, agentRankById, labels, mode, now, visibleAgentId, workspaces, projects }: SessionListViewOptions,
   optimisticMove?: ResourceListItemReorderPayload | null
 ) {
   const workdirDisplay = createSessionWorkdirDisplayMaps(items, workspaces)
-  const sorted = sortSessionsForDisplayGroups(items, { agentRankById, mode, now, workdirDisplay })
+  const sorted = sortSessionsForDisplayGroups(items, { agentRankById, mode, now, workdirDisplay, projects })
   const ordered = optimisticMove ? applyOptimisticSessionDisplayMove(sorted, optimisticMove) : sorted
   const visibleItems =
     visibleAgentId === undefined
@@ -429,7 +460,8 @@ export function deriveSessionListView<T extends SessionListItem>(
     mode,
     now,
     pinnedAsSection: mode !== 'time' && (mode !== 'agent' || hasAgentSection),
-    workdirDisplay
+    workdirDisplay,
+    projects
   })
 
   return { groupBy, items: visibleItems, workdirDisplay }
@@ -468,7 +500,7 @@ export function canDropSessionItemInDisplayGroup({
 }) {
   // Same-group only, so allowing the pinned group cannot move a row out of it:
   // both sides must already be pinned.
-  return mode !== 'time' && sourceGroupId === targetGroupId
+  return mode !== 'time' && mode !== 'project' && sourceGroupId === targetGroupId
 }
 
 export function applyOptimisticSessionDisplayMove<T extends SessionListItem>(

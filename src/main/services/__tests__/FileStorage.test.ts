@@ -3,17 +3,18 @@ import * as os from 'os'
 import * as path from 'path'
 
 import { BrowserWindow, dialog, shell } from 'electron'
+import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const documentParserMocks = vi.hoisted(() => ({
   extractWord: vi.fn(),
-  parseOfficeAsync: vi.fn()
+  parseOffice: vi.fn()
 }))
 
 // `t` pulls in i18n + preference machinery that isn't initialized under test; the
 // dialog title it produces is irrelevant to these contracts, so stub it to the key.
 vi.mock('@main/i18n', () => ({ t: (key: string) => key }))
-vi.mock('officeparser', () => ({ default: { parseOfficeAsync: documentParserMocks.parseOfficeAsync } }))
+vi.mock('officeparser', () => ({ default: { parseOffice: documentParserMocks.parseOffice } }))
 vi.mock('word-extractor', () => ({
   default: class {
     extract = documentParserMocks.extractWord
@@ -221,10 +222,23 @@ describe('FileStorage', () => {
     it('extracts document content from an uppercase DOCX extension', async () => {
       const documentPath = path.join(os.tmpdir(), `filestorage-read-test-${uniqueId()}.DOCX`)
       fs.writeFileSync(documentPath, 'not plain text')
-      documentParserMocks.parseOfficeAsync.mockResolvedValueOnce('extracted document text')
+      documentParserMocks.parseOffice.mockResolvedValueOnce({ toText: () => 'extracted document text' })
 
       try {
         await expect(fileStorage.readExternalFile(event, documentPath, true)).resolves.toBe('extracted document text')
+      } finally {
+        fs.rmSync(documentPath, { force: true })
+      }
+    })
+
+    it('reads PDF text through the existing local parser', async () => {
+      const documentPath = path.join(os.tmpdir(), `filestorage-read-test-${uniqueId()}.pdf`)
+      const pdf = await PDFDocument.create()
+      const font = await pdf.embedFont(StandardFonts.Helvetica)
+      pdf.addPage().drawText('FileStorage PDF text', { font })
+      fs.writeFileSync(documentPath, await pdf.save())
+      try {
+        expect(await fileStorage.readExternalFile(event, documentPath)).toContain('FileStorage PDF text')
       } finally {
         fs.rmSync(documentPath, { force: true })
       }

@@ -77,6 +77,21 @@ const createLauncherApi = (): ToolLauncherApi => ({
 })
 
 describe('KnowledgeBaseToolRuntime', () => {
+  it('does not offer global knowledge when a project has an empty binding', async () => {
+    mocks.knowledgeBases = [createKnowledgeBase({ id: 'private', name: 'Private' })]
+    mocks.quickPanel.isVisible = true
+    mocks.quickPanel.symbol = ComposerPanelSymbol.KnowledgeBase
+    const launcher = createLauncherApi()
+    render(
+      <KnowledgeBaseToolRuntime launcher={launcher} strictBinding configuredKnowledgeBaseIds={[]} onSelect={vi.fn()} />
+    )
+    await waitFor(() => {
+      const latest = vi.mocked(launcher.registerLaunchers).mock.calls.at(-1)?.[0][0]
+      expect(latest?.rootSearchItems).toEqual([])
+      expect(latest?.disabled).toBe(true)
+    })
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.quickPanel.isVisible = false

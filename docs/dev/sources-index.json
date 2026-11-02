@@ -47,7 +47,7 @@
     },
     {
       "path": "docs/dev/references/ai/ai-usage-records.md",
-      "sources": ["src/main/ai/hooks/billingHook.ts","src/main/ai/utils/usageCapture.ts","src/main/data/db/schemas/aiUsageRecord.ts","src/main/data/services/AiUsageRecordService.ts","src/renderer/pages/settings/ProviderSettings/BillingSettings/BillingPreview.tsx","src/shared/data/types/providerBilling.ts","src/shared/utils/providerBilling.ts","src/shared/utils/usagePricing.ts"]
+      "sources": ["src/main/ai/hooks/billingHook.ts","src/main/ai/utils/usageCapture.ts","src/main/data/db/schemas/aiUsageRecord.ts","src/main/data/services/AiUsageRecordService.ts","src/main/services/providerQuota","src/renderer/pages/settings/ProviderSettings/BillingSettings/BillingPreview.tsx","src/renderer/pages/settings/UsageSettings","src/shared/data/types/providerBilling.ts","src/shared/ipc/schemas/providerQuota.ts","src/shared/utils/providerBilling.ts","src/shared/utils/usagePricing.ts"]
     },
     {
       "path": "docs/dev/references/ai/browser-use-design.md",
@@ -207,7 +207,7 @@
     },
     {
       "path": "docs/dev/references/components/image-preview.md",
-      "sources": ["packages/ui/src/lib/mermaid","src/renderer/components/Preview","src/renderer/services/MermaidRenderService.ts","src/renderer/workers/mermaid.worker.ts"]
+      "sources": ["packages/ui/src/lib/mermaid","scripts/plantumlSandbox.ts","src/renderer/components/Preview","src/renderer/services/MermaidRenderService.ts","src/renderer/workers/mermaid.worker.ts"]
     },
     {
       "path": "docs/dev/references/components/README.md",
@@ -487,7 +487,7 @@
     },
     {
       "path": "docs/dev/references/provider-model/provider-registry.md",
-      "sources": ["packages/provider-registry","src/main/data/db/seeding","src/main/data/services/ModelService.ts","src/main/data/services/ProviderRegistryService.ts"]
+      "sources": ["packages/provider-registry","src/main/ai/provider/listModels.ts","src/main/ai/provider/listModelsSchemas.ts","src/main/data/db/seeding","src/main/data/services/ModelService.ts","src/main/data/services/ProviderRegistryService.ts","src/renderer/pages/settings/ProviderSettings/utils/modelSync.ts"]
     },
     {
       "path": "docs/dev/references/provider-model/README.md",

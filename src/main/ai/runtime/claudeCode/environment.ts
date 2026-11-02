@@ -121,6 +121,19 @@ export async function getClaudeCodeLoginShellEnvironment(
   return env
 }
 
+export function applyClaudeCliLoginEnvironment(
+  env: Record<string, string | undefined>,
+  loginShellEnv: Record<string, string | undefined>
+): void {
+  delete env.ANTHROPIC_API_KEY
+  delete env.ANTHROPIC_AUTH_TOKEN
+  delete env.ANTHROPIC_BASE_URL
+  delete env.ANTHROPIC_CUSTOM_HEADERS
+  delete env.CLAUDE_CODE_OAUTH_TOKEN
+  if (isMac) delete env.CLAUDE_CONFIG_DIR
+  else env.CLAUDE_CONFIG_DIR = loginShellEnv.CLAUDE_CONFIG_DIR || path.join(application.getPath('sys.home'), '.claude')
+}
+
 export async function buildEnvironment(
   provider: Provider,
   agent: AgentEntity
@@ -243,16 +256,7 @@ export async function buildEnvironment(
   // so point at the user's real config dir (their shell's CLAUDE_CONFIG_DIR, or
   // ~/.claude) rather than Cherry's relocated agent config.
   if (isExternalCliProvider(provider)) {
-    delete env.ANTHROPIC_API_KEY
-    delete env.ANTHROPIC_AUTH_TOKEN
-    delete env.ANTHROPIC_BASE_URL
-    delete env.ANTHROPIC_CUSTOM_HEADERS
-    delete env.CLAUDE_CODE_OAUTH_TOKEN
-    if (isMac) {
-      delete env.CLAUDE_CONFIG_DIR
-    } else {
-      env.CLAUDE_CONFIG_DIR = loginShellEnv.CLAUDE_CONFIG_DIR || path.join(application.getPath('sys.home'), '.claude')
-    }
+    applyClaudeCliLoginEnvironment(env, loginShellEnv)
   }
 
   return mergeAgentLoopbackProxyBypass(env)

@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest'
+import { MockUsePreferenceUtils } from '@test-mocks/renderer/usePreference'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type * as StreamdownModule from 'streamdown'
@@ -64,7 +65,9 @@ vi.mock('react-i18next', () => ({
     t: (key: string) =>
       key === 'settings.about.repository.button' ||
       key === 'settings.about.repository.title' ||
-      key === 'settings.about.contact.title'
+      key === 'settings.about.contact.title' ||
+      key === 'settings.about.checkUpdate.label' ||
+      key.startsWith('settings.general.auto_check_update.')
         ? enUS[key as keyof typeof enUS]
         : key === 'settings.doctor.entry.title'
           ? 'System diagnostics'
@@ -99,6 +102,36 @@ describe('AboutSettings diagnostics entry', () => {
       if (route === 'app.get_info') return { isPortable: false, version: '2.0.0' }
       return undefined
     })
+  })
+
+  it('discloses update recipients and lets users disable automatic checks while retaining manual checks', async () => {
+    const user = userEvent.setup()
+    MockUsePreferenceUtils.setPreferenceValue('app.dist.auto_update.enabled', true)
+    await renderAboutSettings()
+
+    const control = screen.getByRole('switch', { name: enUS['settings.general.auto_check_update.title'] })
+    expect(control).toHaveAccessibleDescription(
+      `${enUS['settings.general.auto_check_update.privacy']} ${enUS['settings.general.auto_check_update.control']}`
+    )
+    await user.click(control)
+    await waitFor(() => expect(MockUsePreferenceUtils.getPreferenceValue('app.dist.auto_update.enabled')).toBe(false))
+    await user.click(screen.getByRole('button', { name: enUS['settings.about.checkUpdate.label'] }))
+    expect(mocks.request).toHaveBeenCalledWith('app.updater.check_for_update')
+  })
+
+  it('keeps the release-note privacy disclosure visible in portable builds', async () => {
+    mocks.request.mockImplementation(async (route: string) => {
+      if (route === 'app.get_info') return { isPortable: true, version: '2.1.10' }
+      return undefined
+    })
+    await renderAboutSettings()
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('switch', { name: enUS['settings.general.auto_check_update.title'] })
+      ).not.toBeInTheDocument()
+    )
+    expect(screen.getByText(enUS['settings.general.auto_check_update.privacy'])).toBeVisible()
+    expect(screen.queryByText(enUS['settings.general.auto_check_update.control'])).not.toBeInTheDocument()
   })
 
   it('does not index the removed system diagnostics row', async () => {

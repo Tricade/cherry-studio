@@ -33,11 +33,7 @@ export function useAgentBrowserGuest(
       let status: InputFor<'browser.input.focused'>['status'] = 'unavailable'
       try {
         if (guest?.isConnected) {
-          if (guest.closest('[inert]')) status = 'background'
-          else {
-            guest.focus()
-            if (guest.ownerDocument.activeElement === guest) status = 'focused'
-          }
+          status = guest.closest('[inert]') || guest.ownerDocument.activeElement !== guest ? 'background' : 'focused'
         }
       } catch (error) {
         logger.debug('Browser guest could not receive input focus', { error })

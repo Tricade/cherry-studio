@@ -2,7 +2,7 @@ import { ScanLine, Settings2, Terminal, ToolCase } from 'lucide-react'
 import React, { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { Alert, Tooltip } from '@cherrystudio/ui'
+import { Alert, Button, Tooltip } from '@cherrystudio/ui'
 import { loggerService } from '@logger'
 import { AgentContextUsageSummary } from '@renderer/components/chat/agent/AgentContextUsageSummary'
 import { ContextUsageMeter } from '@renderer/components/chat/contextUsage'
@@ -48,6 +48,7 @@ import {
   openResourceEditDialog,
   ResourceEditDialogEventHost
 } from '@renderer/components/resourceCatalog/dialogs/ResourceEditDialogEventHost'
+import { useDataChange, useQuery } from '@renderer/data/hooks/useDataApi'
 import { usePreference } from '@renderer/data/hooks/usePreference'
 import { useUpdateAgent } from '@renderer/hooks/agent/useAgent'
 import { useAgentModelFilter } from '@renderer/hooks/agent/useAgentModelFilter'
@@ -166,6 +167,7 @@ const createSkillQuickPanelItems = (
 }
 
 type AgentComposerSessionSnapshot = {
+  projectId?: string
   workspace?: AgentConversationWorkspace | null
   workspaceId?: string | null
 }
@@ -246,6 +248,18 @@ const AgentComposerRoot = ({
   deferQuickPanel = false
 }: AgentComposerRootProps) => {
   const session = sessionOverride
+  const {
+    data: project,
+    error: projectError,
+    refetch: refetchProject
+  } = useQuery('/agent-projects/:projectId', {
+    params: { projectId: session.projectId ?? '' },
+    enabled: !!session.projectId
+  })
+  useDataChange(session.projectId ? '/agent-projects/:projectId' : [], () => void refetchProject())
+  const { t } = useTranslation()
+  const projectMemberRemoved = !!session.projectId && !!project && !project.agentIds.includes(agentId)
+  const projectUnavailable = !!session.projectId && (!project || !!projectError || projectMemberRemoved)
   const agent = resolvedAgent
   const sessionModel = resolvedModel
   const actionsRef = useRef<ProviderActionHandlers>({ ...emptyActions })
@@ -317,12 +331,13 @@ const AgentComposerRoot = ({
     return {
       agentId,
       sessionId,
+      projectId: session.projectId,
       agentType: agent.type,
       accessiblePaths,
       slashCommands: sessionSlashCommands,
-      knowledgeBaseIds: agent.knowledgeBaseIds ?? []
+      knowledgeBaseIds: session.projectId ? (project?.knowledgeBaseIds ?? []) : (agent.knowledgeBaseIds ?? [])
     }
-  }, [session, agent, agentId, sessionId, sessionSlashCommands])
+  }, [session, agent, agentId, sessionId, sessionSlashCommands, project])
 
   const initialState = useMemo(
     () => ({
@@ -346,6 +361,19 @@ const AgentComposerRoot = ({
           void onCreateEmptySession?.()
         }
       }}>
+      {projectMemberRemoved ? (
+        <Alert type="warning" message={t('project.member_removed')} />
+      ) : projectError && session.projectId ? (
+        <Alert
+          type="error"
+          message={t('project.load_failed')}
+          description={
+            <Button variant="outline" onClick={() => void refetchProject()}>
+              {t('common.retry')}
+            </Button>
+          }
+        />
+      ) : null}
       <AgentComposerInner
         key={scopedComposerInstanceKey}
         agent={agent}
@@ -371,7 +399,7 @@ const AgentComposerRoot = ({
         workspaceChanging={workspaceChanging}
         canChangeModel={canChangeModel}
         isStreaming={isStreaming}
-        sendDisabled={sendDisabled}
+        sendDisabled={sendDisabled || projectUnavailable}
         compactWhenSingleLine={compactWhenSingleLine}
         previewInputFile={previewInputFile}
         launchOptions={launchOptions}
@@ -751,7 +779,8 @@ const AgentComposerInner = ({
     knowledgeBaseIdsRef,
     syncKnowledgeBaseIds
   } = useComposerKnowledgeBaseScope({
-    configuredKnowledgeBaseIds: agent?.knowledgeBaseIds,
+    configuredKnowledgeBaseIds: sessionData?.knowledgeBaseIds ?? agent?.knowledgeBaseIds,
+    strictBinding: !!sessionData?.projectId,
     allKnowledgeBases,
     isKnowledgeBasesLoading,
     scopeKey: selectedKnowledgeBasesScopeKey,

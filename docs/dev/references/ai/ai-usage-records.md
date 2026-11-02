@@ -9,6 +9,9 @@ sources:
   - src/shared/utils/providerBilling.ts
   - src/shared/utils/usagePricing.ts
   - src/renderer/pages/settings/ProviderSettings/BillingSettings/BillingPreview.tsx
+  - src/renderer/pages/settings/UsageSettings
+  - src/main/services/providerQuota
+  - src/shared/ipc/schemas/providerQuota.ts
 ---
 
 # AI Usage Records
@@ -58,6 +61,43 @@ invoices remain authoritative.
   - `GET /ai-usage-records`
   - `GET /ai-usage-records/stats`
   - `GET /ai-usage-records/timeline`
+
+## Account quotas
+
+Settings > Usage has a separate, manually refreshed account-quota panel using
+`provider.quota.read` IPC. These reports are transient account-wide snapshots,
+not invocation records: they are neither persisted nor attributed to individual
+Cherry conversations. Existing token statistics can still contain API-equivalent
+price estimates for subscription traffic. The panel labels included plan usage
+as zero additional usage charge and separates paid extra usage; it does not
+claim that the subscription itself is free.
+
+- Codex uses an already installed CLI's read-only `account/rateLimits/read`
+  app-server request. The response account ID must match Cherry's OAuth account,
+  which is checked again after the request. No CLI is installed, no turn is
+  started, and reset credits are never consumed. Analytics, feedback and OTLP
+  exporters are disabled for this process. Compatibility was checked against
+  the official `rust-v0.166.0-alpha.5.1` protocol; unsupported installed versions
+  fail without inventing quotas.
+- Claude uses the pinned Agent SDK/native CLI `0.3.284` experimental usage
+  control request with `skipBehaviors: true`, using the same CLI login profile
+  as external-CLI sessions. The held empty input stream sends no inference
+  prompt. User settings, plugins and MCP servers are disabled; managed policy
+  hooks can still apply according to the SDK contract. The experimental API
+  can change when the pinned SDK is updated.
+- CherryIN reads its authenticated balance endpoint without fetching a personal
+  profile. A response is withheld if the credential changed during the request.
+  Reported quota units remain raw; the endpoint does not establish a currency.
+- Other sign-in methods explicitly report unsupported. Refresh does not request
+  broader OAuth scopes or probe third-party billing endpoints.
+
+Shared/model scope and time windows come from the provider. Missing values are
+not zero, shared quotas are not divided among models, and tokens are never
+converted into percentages. Credits and spending limits retain reported units:
+the Claude usage control type does not specify a monetary scale, so its numbers
+must not silently be formatted as major currency units. Manual refresh can
+contact the provider through its CLI or OAuth transport, including CLI account
+discovery; this is separate from inference and local transcript scanning.
 
 ## Invariants and ownership
 

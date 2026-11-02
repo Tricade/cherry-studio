@@ -22,6 +22,7 @@ process.stderr.setMaxListeners(64)
 
 const mainConfig = (electronViteConfig as any).main
 const rendererConfig = (electronViteConfig as any).renderer
+const maxWorkers = process.env.CI ? '50%' : 2
 
 export default defineConfig({
   test: {
@@ -114,6 +115,8 @@ export default defineConfig({
         test: {
           name: 'aiCore',
           environment: 'node',
+          // This project extends its package config, so it does not inherit the root worker limit.
+          maxWorkers,
           include: [
             'packages/aiCore/**/*.{test,spec}.{ts,tsx}',
             'packages/aiCore/**/__tests__/**/*.{test,spec}.{ts,tsx}'
@@ -264,8 +267,8 @@ export default defineConfig({
     },
     testTimeout: 20000,
     pool: 'threads',
-    // Vitest 4 uses all available parallelism by default. Cap workers so the
+    // Vitest uses all available parallelism by default. Cap workers so the
     // full suite does not starve subprocess, worker-thread, and timing tests.
-    maxWorkers: process.env.CI ? '50%' : 2
+    maxWorkers
   }
 })

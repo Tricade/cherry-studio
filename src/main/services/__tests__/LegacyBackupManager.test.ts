@@ -676,6 +676,7 @@ describe('BackupManager direct v2 data compatibility', () => {
     expect(options.excludeRelativePath('restore-journal.json')).toBe(true)
     expect(options.excludeRelativePath('restore-journal.json.tmp')).toBe(true)
     expect(options.excludeRelativePath('Agents/.claude/projects/session.jsonl')).toBe(false)
+    expect(options.excludeRelativePath('Projects/project/agent/memory/FACT.md')).toBe(false)
     expect(options.excludeRelativePath('Files/document.pdf')).toBe(false)
   })
 
@@ -700,6 +701,7 @@ describe('BackupManager direct v2 data compatibility', () => {
     expect(options.excludeRelativePath('cherrystudio.sqlite-shm')).toBe(true)
     expect(options.excludeRelativePath('restore-journal.json')).toBe(true)
     expect(options.excludeRelativePath('Agents')).toBe(true)
+    expect(options.excludeRelativePath('Projects/project/agent/memory/FACT.md')).toBe(true)
     expect(options.excludeRelativePath('Files/document.pdf')).toBe(true)
     expect(fs.writeJson).toHaveBeenCalledWith(
       '/mock/temp/backup/create-operation-id/metadata.json',
@@ -1316,10 +1318,10 @@ describe('BackupManager direct v2 data compatibility', () => {
     vi.mocked(fs.readdir).mockImplementation(async (entryPath) => {
       const directory = String(entryPath)
       if (directory === '/mock/userData/restore-staging/operation-id/resources/Data') {
-        return ['Files', 'Agents'] as never
+        return ['Files', 'Agents', 'Projects'] as never
       }
       if (directory === '/mock/userData/Data') {
-        return ['Files', 'Agents', 'KnowledgeBase', 'cherrystudio.sqlite', 'restore-journal.json'] as never
+        return ['Files', 'Agents', 'Projects', 'KnowledgeBase', 'cherrystudio.sqlite', 'restore-journal.json'] as never
       }
       return [] as never
     })
@@ -1328,7 +1330,12 @@ describe('BackupManager direct v2 data compatibility', () => {
       if (
         entry === '/extract/Data' ||
         entry.startsWith('/mock/userData/restore-staging/operation-id/resources/Data/') ||
-        ['/mock/userData/Data/Files', '/mock/userData/Data/Agents', '/mock/userData/Data/KnowledgeBase'].includes(entry)
+        [
+          '/mock/userData/Data/Files',
+          '/mock/userData/Data/Agents',
+          '/mock/userData/Data/Projects',
+          '/mock/userData/Data/KnowledgeBase'
+        ].includes(entry)
       ) {
         return createStats('directory') as never
       }
@@ -1342,7 +1349,7 @@ describe('BackupManager direct v2 data compatibility', () => {
     const dataResourcePaths = journal.fileResources
       .map((resource: { livePath: string }) => resource.livePath)
       .filter((livePath: string) => livePath.startsWith('Data/'))
-    expect(dataResourcePaths).toEqual(['Data/Agents', 'Data/Files', 'Data/KnowledgeBase'])
+    expect(dataResourcePaths).toEqual(['Data/Agents', 'Data/Files', 'Data/KnowledgeBase', 'Data/Projects'])
     expect(dataResourcePaths).not.toContain('Data/cherrystudio.sqlite')
     expect(dataResourcePaths).not.toContain('Data/restore-journal.json')
     expect(dataResourcePaths).not.toContain('Data/Agents/.claude')

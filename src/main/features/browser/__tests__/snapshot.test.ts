@@ -157,13 +157,20 @@ describe('browser snapshots', () => {
     expect(tree.nodes.find((node) => node.backendNodeId === 3)).toMatchObject({ ref: 'e3', name: 'Submit', depth: 0 })
   })
 
-  it('does not copy data URL payloads or URL credentials into the snapshot header', () => {
+  it('does not expose URL credentials, query secrets or fragments in snapshot headers', () => {
     const tree = buildSnapshotTree(fixture(), (id) => `e${id}`)
     const base = { ...tree, documentId: 'doc', title: 'Form', truncated: false }
     expect(serializeSnapshot({ ...base, url: 'data:text/html,<input value="SECRET">' }, 40_000).text).not.toContain(
       'SECRET'
     )
     expect(serializeSnapshot({ ...base, url: 'https://user:SECRET@example.com/' }, 40_000).text).not.toContain('SECRET')
+    const result = serializeSnapshot(
+      { ...base, url: 'https://example.com/callback?unknown=SECRET&code=SECRET#access_token=SECRET' },
+      40_000
+    ).text
+    expect(result).toContain('https://example.com/callback')
+    expect(result).not.toContain('SECRET')
+    expect(result).not.toContain('unknown=')
   })
 
   it('sanitizes the browser default title when it repeats the page URL', async () => {
@@ -180,8 +187,14 @@ describe('browser snapshots', () => {
     ['https://user:SECRET@example.com/path', 'https://example.com/path'],
     ['//user:SECRET@example.com/path', '//example.com/path'],
     ['data:text/plain,SECRET', 'data:[content omitted]'],
-    ['/account?tab=profile', '/account?tab=profile'],
-    ['#details', '#details']
+    ['https://example.com/callback?unknown=SECRET#SECRET', 'https://example.com/callback'],
+    ['//example.com/callback?unknown=SECRET#SECRET', '//example.com/callback'],
+    ['/account?tab=SECRET', '/account'],
+    ['account?unknown=SECRET#SECRET', 'account'],
+    ['?unknown=SECRET', ''],
+    ['#SECRET', ''],
+    ['javascript:alert("SECRET")', 'javascript:[content omitted]'],
+    ['blob:https://example.com/SECRET', 'blob:[content omitted]']
   ])('sanitizes link destinations before exposing snapshot nodes: %s', (href, safeHref) => {
     const raw = fixture()
     const key = raw.dom!.strings.push('href') - 1

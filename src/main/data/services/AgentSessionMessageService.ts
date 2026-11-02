@@ -18,6 +18,7 @@ import { fileEntryTable } from '@data/db/schemas/file'
 import { agentSessionMessageFileRefTable } from '@data/db/schemas/fileRelations'
 import { defaultHandlersFor, withSqliteErrors } from '@data/db/sqliteErrors'
 import type { DbOrTx } from '@data/db/types'
+import { agentProjectService } from '@data/services/AgentProjectService'
 import { agentSessionReadModelEffects, agentSessionService } from '@data/services/AgentSessionService'
 import { registerDataService } from '@data/services/dataServiceRegistry'
 import { timestampToISO } from '@data/services/utils/rowMappers'
@@ -1355,10 +1356,18 @@ export class AgentSessionMessageService {
     const message = withSqliteErrors(
       () =>
         application.get('DbService').withWriteTx((tx) => {
+          const sender = tx
+            .select({ projectId: sessionTable.projectId, workspaceId: sessionTable.workspaceId })
+            .from(sessionTable)
+            .where(eq(sessionTable.id, input.senderSessionId))
+            .get()
+          if (sender?.projectId)
+            agentProjectService.assertSessionScopeTx(tx, sender.projectId, input.senderAgentId, sender.workspaceId)
           agentSessionService.createTx(tx, sessionId, {
             agentId: input.targetAgentId ?? input.senderAgentId,
+            projectId: sender?.projectId ?? undefined,
             name: input.sessionName,
-            workspace: input.workspace
+            workspace: sender?.projectId ? { type: 'user', workspaceId: sender.workspaceId } : input.workspace
           })
           return this.acceptSessionDeliveryTx(tx, {
             senderAgentId: input.senderAgentId,

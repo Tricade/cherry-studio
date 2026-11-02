@@ -66,10 +66,15 @@ export function toCreateModelDto(
     name: model.name,
     group: model.group,
     ...(capabilities ? { capabilities: [...capabilities] } : {}),
+    ...(!model.presetModelId && model.inputModalities?.length ? { inputModalities: [...model.inputModalities] } : {}),
+    ...(!model.presetModelId && model.outputModalities?.length
+      ? { outputModalities: [...model.outputModalities] }
+      : {}),
     ...(resolvedEndpointTypes?.length ? { endpointTypes: [...resolvedEndpointTypes] } : {}),
-    // Discovered rather than registry-supplied for local providers — Ollama's window comes from
-    // `/api/show`, and dropping it here leaves the row without one, so no `num_ctx` is ever sent.
-    ...(model.contextWindow ? { contextWindow: model.contextWindow } : {})
+    // Keep independent provider limits; an output cap must not be lost to the runtime's fallback.
+    ...(model.contextWindow ? { contextWindow: model.contextWindow } : {}),
+    ...(model.maxInputTokens ? { maxInputTokens: model.maxInputTokens } : {}),
+    ...(model.maxOutputTokens ? { maxOutputTokens: model.maxOutputTokens } : {})
   }
 }
 
@@ -136,6 +141,12 @@ async function enrichFetchedModels(providerId: string, fetchedModels: Partial<Mo
     const keepFetchedName = !!base.name && base.name !== base.apiModelId
 
     for (const field of REGISTRY_FIELDS) {
+      if (
+        (field === 'contextWindow' || field === 'maxInputTokens' || field === 'maxOutputTokens') &&
+        base[field] !== undefined
+      ) {
+        continue
+      }
       if (field === 'endpointTypes' && base.endpointTypes?.length) {
         continue
       }
@@ -148,6 +159,10 @@ async function enrichFetchedModels(providerId: string, fetchedModels: Partial<Mo
       }
     }
 
+    merged.capabilities = [...new Set([...(merged.capabilities ?? []), ...(base.capabilities ?? [])])]
+    if (base.inputModalities?.length) {
+      merged.inputModalities = [...new Set([...(merged.inputModalities ?? []), ...base.inputModalities])]
+    }
     return merged
   })
 }

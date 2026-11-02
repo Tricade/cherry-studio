@@ -90,11 +90,8 @@ describe('topic browser ownership and cancellation', () => {
       dbh.db.update(topicTable).set({ assistantId: newOwner }).where(eq(topicTable.id, topicId)).run()
       const control = service.createControl({ kind: 'topic', sessionId: topicId, ownerId: newOwner })
       let input = ''
-      const send = fixture.mock.debugger.sendCommand.getMockImplementation()!
-      fixture.mock.debugger.sendCommand.mockImplementation(async (method, params) => {
-        if (method === 'Input.dispatchKeyEvent' && (params as { type: string }).type === 'char')
-          input += (params as { text: string }).text
-        return send(method, params)
+      fixture.mock.sendInputEvent.mockImplementation((event) => {
+        if (event.type === 'char') input += event.keyCode
       })
       vi.mocked(application.get('IpcApiService').send).mockImplementation((eventWindow, event, payload) => {
         if (event !== 'browser.input.focus_requested') return
@@ -124,6 +121,9 @@ describe('topic browser ownership and cancellation', () => {
       const control = service.createControl({ kind: 'topic', sessionId: topicId, ownerId: assistantId })
       const abort = new AbortController()
       let inputs = 0
+      fixture.mock.sendInputEvent.mockImplementation(() => {
+        inputs++
+      })
       const send = fixture.mock.debugger.sendCommand.getMockImplementation()!
       fixture.mock.debugger.sendCommand.mockImplementation(async (method, params) => {
         if (method.startsWith('Input.')) inputs++

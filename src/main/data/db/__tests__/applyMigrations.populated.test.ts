@@ -71,7 +71,7 @@ describe('applyMigrations over a populated database', () => {
   })
 
   it('adds diagnostic history to a populated database and retains it after reopening', () => {
-    applyMigrations(db, baselineMigrationsFolder(join(tempDir, 'baseline')))
+    applyMigrations(db, baselineMigrationsFolder(join(tempDir, 'baseline'), '0026_clammy_the_renegades'))
     const now = Date.now()
     sqlite
       .prepare(
@@ -95,6 +95,39 @@ describe('applyMigrations over a populated database', () => {
     expect(sqlite.prepare('SELECT report_id, submitted_at, processing_status FROM diagnostic_report').all()).toEqual([
       { report_id: 'report-1', submitted_at: now, processing_status: 'pending' }
     ])
+    expect(String(sqlite.pragma('integrity_check', { simple: true }))).toBe('ok')
+  })
+
+  it('adds optional project ownership without changing existing sessions or messages', () => {
+    applyMigrations(db, baselineMigrationsFolder(join(tempDir, 'baseline'), '0030_magenta_leader'))
+    sqlite
+      .prepare(
+        `INSERT INTO agent (id, type, name, instructions, order_key, created_at, updated_at) VALUES ('legacy-agent', 'pi', 'Legacy', 'Keep role', 'a0', 100, 200)`
+      )
+      .run()
+    sqlite
+      .prepare(
+        `INSERT INTO agent_workspace (id, name, path, type, order_key, created_at, updated_at) VALUES ('legacy-workspace', 'Legacy', '/fixture/legacy', 'user', 'a0', 100, 200)`
+      )
+      .run()
+    sqlite
+      .prepare(
+        `INSERT INTO agent_session (id, agent_id, workspace_id, name, order_key, created_at, updated_at, last_activity_at) VALUES ('legacy-session', 'legacy-agent', 'legacy-workspace', 'Old chat', 'a0', 100, 200, 300)`
+      )
+      .run()
+    sqlite
+      .prepare(
+        `INSERT INTO agent_session_message (id, session_id, role, data, status, created_at, updated_at) VALUES ('legacy-message', 'legacy-session', 'user', '{"parts":[{"type":"text","text":"Keep history"}]}', 'success', 100, 200)`
+      )
+      .run()
+    applyMigrations(db, resolveMigrationsPath())
+    expect(
+      sqlite.prepare(`SELECT project_id, name, last_activity_at FROM agent_session WHERE id = 'legacy-session'`).get()
+    ).toEqual({ project_id: null, name: 'Old chat', last_activity_at: 300 })
+    expect(sqlite.prepare(`SELECT data FROM agent_session_message WHERE id = 'legacy-message'`).get()).toEqual({
+      data: '{"parts":[{"type":"text","text":"Keep history"}]}'
+    })
+    expect(sqlite.pragma('foreign_key_check')).toEqual([])
     expect(String(sqlite.pragma('integrity_check', { simple: true }))).toBe('ok')
   })
 

@@ -9,12 +9,17 @@ import * as z from 'zod'
 
 // === OpenAI-compatible (also used by OpenRouter, PPIO, etc.) ===
 
+const OptionalModelTokenLimitSchema = z.number().int().positive().optional().catch(undefined)
+
 const OpenAIModelSchema = z.looseObject({
   id: z.string(),
   name: z.string().optional(),
   object: z.string().optional().default('model'),
   created: z.number().optional(),
-  owned_by: z.string().optional()
+  owned_by: z.string().optional(),
+  max_input_tokens: OptionalModelTokenLimitSchema,
+  max_output_tokens: OptionalModelTokenLimitSchema,
+  mode: z.string().optional().catch(undefined)
 })
 
 const OpenAIModelItemSchema = z.unknown().transform((model) => {
@@ -35,6 +40,26 @@ export const OpenAIModelsResponseSchema = z
       skippedModelCount: response.data.length - data.length
     }
   })
+
+// LiteLLM 1.106.6 reports group maxima, not a combined context window.
+const LiteLLMModelGroupSchema = z.object({
+  model_group: z.string(),
+  max_input_tokens: OptionalModelTokenLimitSchema,
+  max_output_tokens: OptionalModelTokenLimitSchema,
+  mode: z.string().optional().catch(undefined),
+  supports_vision: z.boolean().optional().catch(undefined),
+  supports_function_calling: z.boolean().optional().catch(undefined),
+  supports_reasoning: z.boolean().optional().catch(undefined)
+})
+
+export const LiteLLMModelGroupsResponseSchema = z.object({
+  data: z.array(z.unknown()).transform((rows) =>
+    rows.flatMap((row) => {
+      const result = LiteLLMModelGroupSchema.safeParse(row)
+      return result.success ? [result.data] : []
+    })
+  )
+})
 
 // === Poe (OpenAI-compatible with declared endpoint paths) ===
 

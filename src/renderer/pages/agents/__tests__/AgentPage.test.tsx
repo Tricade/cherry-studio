@@ -77,7 +77,7 @@ const agentPageMocks = vi.hoisted(() => ({
   setClassicLayoutRightPaneOpenOverride: vi.fn(),
   setShowSidebar: vi.fn(),
   closeConversationTabs: vi.fn(),
-  sessionDisplayMode: 'time' as 'time' | 'workdir' | 'agent',
+  sessionDisplayMode: 'time' as 'time' | 'workdir' | 'agent' | 'project',
   sessionPanePosition: 'right' as 'left' | 'right',
   isActiveTab: false,
   showSidebar: false,

@@ -8,7 +8,7 @@ on:
   schedule:
     - cron: "17 3 * * *"
   push:
-    branches: [main, "release/v*"]
+    branches: ["**"]
   pull_request:
     types: [ready_for_review, synchronize, opened, reopened]
 
@@ -261,7 +261,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-2022]
+        os: [macos-26-intel, windows-2022]
     steps:
       - uses: actions/checkout@v7
       - name: macOS native build prerequisites

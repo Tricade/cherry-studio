@@ -1,8 +1,11 @@
 import '@vitest/web-worker'
-import { waitFor } from '@testing-library/react'
+import { cleanup, render, waitFor } from '@testing-library/react'
 import { Editor } from '@tiptap/core'
+import { EditorContent } from '@tiptap/react'
+import { createElement } from 'react'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
 
+import { CodeStyleProvider } from '@renderer/components/CodeStyleProvider'
 import { codeHighlightService } from '@renderer/services/CodeHighlightService'
 
 import { createRichEditorExtensions } from '../createExtensions'
@@ -16,9 +19,11 @@ function create(content: string) {
     contentType: 'markdown'
   })
   editors.push(editor)
+  render(createElement(EditorContent, { editor }), { wrapper: CodeStyleProvider })
   return editor
 }
 afterEach(() => {
+  cleanup()
   for (const editor of editors) editor.destroy()
   editors.length = 0
 })

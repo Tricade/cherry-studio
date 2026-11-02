@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { Button, InfoTooltip, Input, RowFlex, Switch, WarnTooltip } from '@cherrystudio/ui'
 import { usePreference } from '@data/hooks/usePreference'
 import AppLogo from '@renderer/assets/images/logo.png'
+import { BackupDisclosure } from '@renderer/components/BackupDisclosure'
 import { S3BackupManager } from '@renderer/components/S3BackupManager'
 import { S3BackupModal, useS3BackupModal } from '@renderer/components/S3Modals'
 import Selector from '@renderer/components/Selector'
@@ -114,6 +115,7 @@ const S3Settings: FC = () => {
           onClick={handleTitleClick}
         />
       </SettingTitle>
+      <BackupDisclosure target="s3" />
       <SettingHelpText>{t('settings.data.s3.title.help')}</SettingHelpText>
       <SettingDivider />
       <SettingRow id="setting-data-s3-endpoint" className="scroll-mt-6">

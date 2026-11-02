@@ -24,10 +24,10 @@ export function diagnosticRangeLabelKey(range: DiagnosticRange) {
   return RANGE_TRANSLATION_KEYS[range]
 }
 
-export function useDiagnosticSourceSelection(onSelectionChange: () => void) {
+export function useDiagnosticSourceSelection(onSelectionChange: () => void, optionalSourcesInitiallySelected = true) {
   const [range, setRange] = useState<DiagnosticRange>('24h')
-  const [includeLogs, setIncludeLogs] = useState(true)
-  const [includeTraces, setIncludeTraces] = useState(true)
+  const [includeLogs, setIncludeLogs] = useState(optionalSourcesInitiallySelected)
+  const [includeTraces, setIncludeTraces] = useState(optionalSourcesInitiallySelected)
   const [includeChatRecords, setIncludeChatRecords] = useState(false)
   const [inspectResult, setInspectResult] = useState<InspectResult | null>(null)
   const [inspectError, setInspectError] = useState(false)

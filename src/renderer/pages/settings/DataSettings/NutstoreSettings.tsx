@@ -7,6 +7,7 @@ import { type FileStat } from 'webdav'
 
 import { Button, Input, RowFlex, Switch, WarnTooltip } from '@cherrystudio/ui'
 import { usePreference } from '@data/hooks/usePreference'
+import { BackupDisclosure } from '@renderer/components/BackupDisclosure'
 import Selector from '@renderer/components/Selector'
 import {
   SettingDivider,
@@ -216,6 +217,7 @@ const NutstoreSettings: FC = () => {
   return (
     <SettingGroup theme={theme}>
       <SettingTitle>{t('settings.data.nutstore.title')}</SettingTitle>
+      <BackupDisclosure target="nutstore" />
       <SettingDivider />
       <SettingRow>
         <SettingRowTitle>
@@ -347,6 +349,7 @@ const NutstoreSettings: FC = () => {
       )}
       <>
         <WebdavBackupModal
+          target="nutstore"
           isModalVisible={isModalVisible}
           handleBackup={handleBackup}
           handleCancel={handleCancel}

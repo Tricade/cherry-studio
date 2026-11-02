@@ -17,6 +17,7 @@ import { composerKnowledgeBaseTokenId, knowledgeBaseToComposerToken } from './co
 const KNOWLEDGE_BASE_IDS_KEY_SEPARATOR = '\u0000'
 
 interface UseComposerKnowledgeBaseScopeParams {
+  strictBinding?: boolean
   /** Knowledge base ids configured on the active assistant or Agent. */
   configuredKnowledgeBaseIds: readonly string[] | undefined
   allKnowledgeBases: KnowledgeBase[]
@@ -55,6 +56,7 @@ interface UseComposerKnowledgeBaseScopeResult {
  */
 export function useComposerKnowledgeBaseScope({
   configuredKnowledgeBaseIds,
+  strictBinding = false,
   allKnowledgeBases,
   isKnowledgeBasesLoading,
   scopeKey,
@@ -89,7 +91,7 @@ export function useComposerKnowledgeBaseScope({
   )
   const filterSelectableKnowledgeBases = useCallback(
     (bases: readonly KnowledgeBase[]) => {
-      if (configuredKnowledgeBaseIdSet.size === 0)
+      if (configuredKnowledgeBaseIdSet.size === 0 && !strictBinding)
         return bases.filter((base) => isKnowledgeBasesLoading || availableKnowledgeBaseIdSet.has(base.id))
       return bases.filter(
         (base) =>
@@ -97,7 +99,7 @@ export function useComposerKnowledgeBaseScope({
           (isKnowledgeBasesLoading || availableKnowledgeBaseIdSet.has(base.id))
       )
     },
-    [availableKnowledgeBaseIdSet, configuredKnowledgeBaseIdSet, isKnowledgeBasesLoading]
+    [availableKnowledgeBaseIdSet, configuredKnowledgeBaseIdSet, isKnowledgeBasesLoading, strictBinding]
   )
   const selectableKnowledgeBases = useMemo(
     () => filterSelectableKnowledgeBases(allKnowledgeBases),

@@ -101,6 +101,42 @@ describe('CherryInOAuthService', () => {
     )
   })
 
+  it('reads raw quota units without fetching a personal profile or converting currency', async () => {
+    runtimeMocks.getValidAccessToken.mockResolvedValueOnce({ accessToken: 'oauth-access' })
+    netMocks.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true, data: { quota: 64250000, used_quota: 3410000 } })
+    })
+    const signal = new AbortController().signal
+    await expect(cherryInOAuthService.getQuotaSnapshot('https://open.cherryin.ai', signal)).resolves.toEqual({
+      quota: 64250000,
+      used_quota: 3410000
+    })
+    expect(netMocks.fetch).toHaveBeenCalledTimes(1)
+    expect(netMocks.fetch).toHaveBeenCalledWith(
+      'https://open.cherryin.ai/api/v1/oauth/balance',
+      expect.objectContaining({ signal })
+    )
+    await expect(cherryInOAuthService.getQuotaSnapshot('https://example.invalid', signal)).rejects.toThrow(
+      'Unauthorized API host'
+    )
+    expect(netMocks.fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([null, { accessToken: 'another-account-token' }])(
+    'withholds a balance when the session changes during the request: %j',
+    async (current) => {
+      netMocks.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true, data: { quota: 10, used_quota: 2 } })
+      })
+      runtimeMocks.getValidAccessToken.mockResolvedValueOnce(current)
+      await expect(
+        cherryInOAuthService.getQuotaSnapshot('https://open.cherryin.ai', new AbortController().signal)
+      ).rejects.toThrow('Account changed during balance request')
+    }
+  )
+
   it('logs 401 response details and surfaces balance HTTP failures', async () => {
     const errorSpy = vi.spyOn(mockMainLoggerService, 'error').mockImplementation(() => {})
     netMocks.fetch.mockResolvedValue({

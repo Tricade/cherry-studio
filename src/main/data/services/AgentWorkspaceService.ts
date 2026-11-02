@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { application } from '@application'
 import { notifyDataApiDataChange } from '@data/dataApiDataChange'
 import { agentChannelTable } from '@data/db/schemas/agentChannel'
+import { agentProjectTable } from '@data/db/schemas/agentProject'
 import { agentSessionTable as sessionsTable } from '@data/db/schemas/agentSession'
 import { type AgentWorkspaceRow, agentWorkspaceTable } from '@data/db/schemas/agentWorkspace'
 import { jobScheduleTable } from '@data/db/schemas/job'
@@ -121,6 +122,12 @@ export class AgentWorkspaceService {
           : and(
               eq(agentWorkspaceTable.type, AGENT_WORKSPACE_TYPE.USER),
               or(
+                exists(
+                  db
+                    .select({ id: agentProjectTable.id })
+                    .from(agentProjectTable)
+                    .where(eq(agentProjectTable.workspaceId, agentWorkspaceTable.id))
+                ),
                 notExists(
                   db
                     .select({ id: sessionsTable.id })
@@ -206,16 +213,30 @@ export class AgentWorkspaceService {
       .all()
     const channels = agentChannelService.listWorkspaceReferencesTx(db, id)
     const tasks = getDataService('AgentTaskService').listWorkspaceReferencesTx(db, id)
+    const projects = db
+      .select({ id: agentProjectTable.id, name: agentProjectTable.name })
+      .from(agentProjectTable)
+      .where(eq(agentProjectTable.workspaceId, id))
+      .all()
 
     return {
       sessions: buildReferenceList(sessions, sessionTotal),
       channels: buildReferenceList(channels),
-      tasks: buildReferenceList(tasks)
+      tasks: buildReferenceList(tasks),
+      projects: buildReferenceList(projects)
     }
   }
 
   findOrCreateByPath(rawPath: string, options: { name?: string } = {}): AgentWorkspaceEntity {
     return this.findOrCreateByPathResult(rawPath, options).workspace
+  }
+
+  assertNoProjectReferencesTx(tx: DbOrTx, id: string): void {
+    if (
+      tx.select({ id: agentProjectTable.id }).from(agentProjectTable).where(eq(agentProjectTable.workspaceId, id)).get()
+    ) {
+      throw DataApiErrorFactory.invalidOperation('delete workspace', 'Remove its project first')
+    }
   }
 
   findOrCreateByPathResult(rawPath: string, options: { name?: string } = {}): FindOrCreateAgentWorkspaceResult {
@@ -367,6 +388,10 @@ export class AgentWorkspaceService {
       .limit(1)
       .all()
     if (session) return false
+    if (
+      tx.select({ id: agentProjectTable.id }).from(agentProjectTable).where(eq(agentProjectTable.workspaceId, id)).get()
+    )
+      return false
     if (agentChannelService.listWorkspaceReferencesTx(tx, id).length > 0) return false
     if (getDataService('AgentTaskService').listWorkspaceReferencesTx(tx, id).length > 0) return false
 

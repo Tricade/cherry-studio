@@ -24,8 +24,9 @@ const mocks = vi.hoisted(() => ({
     'settings.about.diagnostics.actions.reveal': 'Show in folder',
     'settings.about.diagnostics.errors.busy': 'Another diagnostic bundle operation is already in progress',
     'settings.about.diagnostics.inspecting': 'Inspecting diagnostic data…',
-    'settings.about.diagnostics.report.acknowledgement':
-      'Upload logs for troubleshooting only. They may contain chat history, device information, and other data.',
+    'settings.about.diagnostics.preview.acknowledgement': 'Send the previewed report',
+    'settings.about.diagnostics.preview.prepare': 'Prepare preview',
+    'settings.about.diagnostics.preview.content': 'File preview',
     'settings.about.diagnostics.report.copy_id': 'Copy feedback ID',
     'settings.about.diagnostics.report.copy_url': 'Copy status link',
     'settings.about.diagnostics.report.description_label': 'Problem description',
@@ -66,7 +67,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@cherrystudio/ui', async (importOriginal) => importOriginal())
 
 vi.mock('@renderer/ipc', () => ({
-  ipcApi: { request: (...args: unknown[]) => mocks.request(...args) }
+  ipcApi: {
+    request: (...args: unknown[]) =>
+      Promise.resolve(mocks.request(...args)).then((value) => (value === undefined ? previewResponse(args) : value))
+  }
 }))
 
 vi.mock('@renderer/services/LoggerService', () => ({
@@ -120,8 +124,47 @@ const savedUploadResult: Extract<OutputFor<'diagnostics.bundle.save_upload'>, { 
   status: 'saved'
 }
 
+function previewResponse([route, input]: unknown[]) {
+  if (route === 'diagnostics.bundle.inspect')
+    return {
+      hasWarnings: false,
+      sourceLimitBytes: 1024,
+      sources: {
+        logs: { available: true, fileCount: 1, estimatedBytes: 10 },
+        traces: { available: true, fileCount: 1, estimatedBytes: 10 },
+        chatRecords: { available: true, messageCount: 1, estimatedBytes: 10 },
+        crashDumps: { fileCount: 0 }
+      }
+    }
+  if (route === 'diagnostics.bundle.prepare_upload')
+    return {
+      status: 'prepared',
+      bundleId,
+      fileName: 'diagnostics.zip',
+      description: (input as { description: string }).description,
+      destination: 'https://api.cherry-ai.com/diagnostics',
+      archiveBytes: 100,
+      fileSha256: 'a'.repeat(64),
+      hasWarnings: false,
+      entries: [{ name: 'diagnostics.json', bytes: 10 }]
+    }
+  if (route === 'diagnostics.bundle.preview_entry') return { text: '{"system":"synthetic"}', nextOffset: null }
+  if (route === 'diagnostics.bundle.discard_upload') return { status: 'discarded' }
+  return undefined
+}
+
+async function prepareAndConsent(user: ReturnType<typeof userEvent.setup>) {
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Prepare preview' })).toBeEnabled())
+  await user.click(screen.getByRole('button', { name: 'Prepare preview' }))
+  await waitFor(() =>
+    expect(screen.getByRole('textbox', { name: 'File preview' })).toHaveValue('{"system":"synthetic"}')
+  )
+  await user.click(screen.getByRole('checkbox', { name: 'Send the previewed report' }))
+}
+
 async function completeReview(user: ReturnType<typeof userEvent.setup>, description = '  App freezes on launch.  ') {
   await user.type(screen.getByRole('textbox', { name: 'Problem description' }), description)
+  await prepareAndConsent(user)
   await waitFor(() => expect(screen.getByRole('button', { name: 'Submit diagnostic report' })).toBeEnabled())
 }
 
@@ -193,13 +236,13 @@ describe('DiagnosticUploadPanel', () => {
     const user = userEvent.setup()
     render(<DiagnosticUploadDialog open onOpenChange={vi.fn()} />)
 
-    const submit = screen.getByRole('button', { name: 'Submit diagnostic report' })
+    const submit = screen.getByRole('button', { name: 'Prepare preview' })
     const description = screen.getByRole('textbox', { name: 'Problem description' })
     const acknowledgement = screen.getByRole('checkbox', {
-      name: 'Upload logs for troubleshooting only. They may contain chat history, device information, and other data.'
+      name: 'Send the previewed report'
     })
 
-    expect(acknowledgement).toBeChecked()
+    expect(acknowledgement).not.toBeChecked()
     await waitFor(() => expect(submit).toBeEnabled())
     await user.click(submit)
 
@@ -221,7 +264,7 @@ describe('DiagnosticUploadPanel', () => {
     const user = userEvent.setup()
     render(<DiagnosticUploadDialog open onOpenChange={vi.fn()} />)
 
-    const submit = screen.getByRole('button', { name: 'Submit diagnostic report' })
+    const submit = screen.getByRole('button', { name: 'Prepare preview' })
     const description = screen.getByRole('textbox', { name: 'Problem description' })
     await user.click(description)
     await user.paste('x'.repeat(4097))
@@ -234,40 +277,38 @@ describe('DiagnosticUploadPanel', () => {
     expect(mocks.request.mock.calls.filter(([route]) => route === 'diagnostics.bundle.upload')).toHaveLength(0)
   })
 
-  it('defaults to uploading all sources for the last 24 hours and blocks submission when unchecked', async () => {
+  it('requires a selected, previewed package and fresh consent after editing', async () => {
     const user = userEvent.setup()
     render(<DiagnosticUploadDialog open onOpenChange={vi.fn()} />)
-
     const description = screen.getByRole('textbox', { name: 'Problem description' })
-    const acknowledgement = screen.getByRole('checkbox', {
-      name: 'Upload logs for troubleshooting only. They may contain chat history, device information, and other data.'
-    })
+    const acknowledgement = screen.getByRole('checkbox', { name: 'Send the previewed report' })
     const submit = screen.getByRole('button', { name: 'Submit diagnostic report' })
-    expect(acknowledgement).toBeChecked()
-    expect(submit).toBeEnabled()
-    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
-    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
-    expect(screen.queryByText('Time range')).not.toBeInTheDocument()
-    await user.type(description, '  App freezes on launch.  ')
-    await user.click(acknowledgement)
     expect(acknowledgement).not.toBeChecked()
     expect(submit).toBeDisabled()
-    await user.click(acknowledgement)
-    await waitFor(() => expect(submit).toBeEnabled())
-
-    await user.type(description, ' Please investigate. ')
-    expect(acknowledgement).toBeChecked()
-    await user.click(submit)
-
-    await waitFor(() =>
-      expect(mocks.request).toHaveBeenCalledWith('diagnostics.bundle.upload', {
-        description: 'App freezes on launch.   Please investigate.',
-        includeChatRecords: true,
-        includeLogs: true,
-        includeTraces: true,
-        range: '24h'
-      })
-    )
+    await waitFor(() => expect(screen.getByRole('switch', { name: 'App logs' })).toBeEnabled())
+    for (const name of ['App logs', 'Detailed activity records', 'Chat history']) {
+      expect(screen.getByRole('switch', { name })).not.toBeChecked()
+    }
+    await user.click(screen.getByRole('switch', { name: 'App logs' }))
+    await user.type(description, 'App freezes')
+    await prepareAndConsent(user)
+    expect(mocks.request).toHaveBeenCalledWith('diagnostics.bundle.prepare_upload', {
+      description: 'App freezes',
+      includeChatRecords: false,
+      includeLogs: true,
+      includeTraces: false,
+      range: '24h'
+    })
+    expect(mocks.request.mock.calls.filter(([route]) => route === 'diagnostics.bundle.upload')).toHaveLength(0)
+    expect(screen.getByRole('button', { name: 'Submit diagnostic report' })).toBeEnabled()
+    await user.type(description, ' on launch')
+    expect(acknowledgement).not.toBeChecked()
+    expect(screen.getByRole('button', { name: 'Submit diagnostic report' })).toBeDisabled()
+    expect(screen.queryByRole('textbox', { name: 'File preview' })).not.toBeInTheDocument()
+    expect(mocks.request).toHaveBeenCalledWith('diagnostics.bundle.discard_upload', { bundleId })
+    await prepareAndConsent(user)
+    await user.click(screen.getByRole('button', { name: 'Submit diagnostic report' }))
+    expect(mocks.request).toHaveBeenCalledWith('diagnostics.bundle.upload', { bundleId, confirmed: true })
   })
 
   it('exposes no dismiss action while submitting and shows the report status details on success', async () => {
@@ -359,16 +400,14 @@ describe('DiagnosticUploadPanel', () => {
 
     await user.clear(description)
     await user.type(description, 'The app freezes after reopening.')
+    await prepareAndConsent(user)
     await user.click(screen.getByRole('button', { name: 'Submit diagnostic report' }))
 
     expect(await screen.findByText(reportId)).toBeInTheDocument()
     expect(mocks.request.mock.calls.filter(([route]) => route === 'diagnostics.bundle.upload')).toHaveLength(2)
     expect(mocks.request).toHaveBeenLastCalledWith('diagnostics.bundle.upload', {
-      description: 'The app freezes after reopening.',
-      includeChatRecords: true,
-      includeLogs: true,
-      includeTraces: true,
-      range: '24h'
+      bundleId,
+      confirmed: true
     })
   })
 

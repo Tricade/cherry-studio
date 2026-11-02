@@ -1,7 +1,8 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { mkdtemp } from 'node:fs/promises'
 import path from 'node:path'
 
+import AdmZip from 'adm-zip'
 import { Mutex } from 'async-mutex'
 import { dialog } from 'electron'
 
@@ -10,6 +11,7 @@ import { diagnosticReportService } from '@data/services/DiagnosticReportService'
 import { loggerService } from '@logger'
 import { t } from '@main/i18n'
 import {
+  atomicWriteFile,
   createAtomicWriteStream,
   isPathInside,
   move,
@@ -26,7 +28,11 @@ import { IpcError } from '@shared/ipc/errors/IpcError'
 import type { DiagnosticRange } from '@shared/ipc/schemas/diagnostics'
 import type { InputFor, OutputFor, WindowId } from '@shared/ipc/types'
 import { type AbsoluteFilePath, AbsoluteFilePathSchema } from '@shared/types/file'
-import { diagnosticReportUrl, normalizeDiagnosticDescription } from '@shared/utils/diagnostics'
+import {
+  DIAGNOSTIC_REPORT_BASE_URL,
+  diagnosticReportUrl,
+  normalizeDiagnosticDescription
+} from '@shared/utils/diagnostics'
 
 import {
   addChatRecordStats,
@@ -86,6 +92,8 @@ type ExportResult = OutputFor<'diagnostics.bundle.export'>
 type SavedBundle = Extract<ExportResult, { status: 'saved' }>
 type UploadInput = InputFor<'diagnostics.bundle.upload'>
 type UploadResult = OutputFor<'diagnostics.bundle.upload'>
+type PrepareInput = InputFor<'diagnostics.bundle.prepare_upload'>
+type PrepareResult = OutputFor<'diagnostics.bundle.prepare_upload'>
 type RetryUploadInput = InputFor<'diagnostics.bundle.retry_upload'>
 type RetryUploadResult = OutputFor<'diagnostics.bundle.retry_upload'>
 type SaveUploadInput = InputFor<'diagnostics.bundle.save_upload'>
@@ -111,8 +119,37 @@ type RetainedUploadBundle =
 interface RetainedUpload {
   bundle: RetainedUploadBundle
   readonly description: string
-  readonly fileSha256?: string
+  readonly fileSha256: string
+  readonly fileBytes: Buffer
+  readonly owner: WindowId
+  readonly createdAt: number
+  confirmed: boolean
+  readonly entries: { name: string; bytes: number }[]
   readonly uploadFileName: string
+}
+
+const MAX_PREPARED_ARCHIVE_BYTES = 100 * 1024 * 1024
+const PREVIEW_PAGE_CHARACTERS = 64 * 1024
+const PREPARED_UPLOAD_LIFETIME_MS = 60 * 60 * 1000
+
+async function readPreparedArchive(filePath: AbsoluteFilePath): Promise<Buffer> {
+  const snapshot = await openReadableFileSnapshot(filePath)
+  try {
+    if (snapshot.size <= 0 || snapshot.size > MAX_PREPARED_ARCHIVE_BYTES)
+      throw new Error('Invalid diagnostic archive size')
+    const chunks: Buffer[] = []
+    let size = 0
+    for await (const chunk of snapshot.createReadStream()) {
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+      size += bytes.length
+      if (size > snapshot.size) throw new Error('Diagnostic archive changed during preparation')
+      chunks.push(bytes)
+    }
+    if (size !== snapshot.size) throw new Error('Diagnostic archive changed during preparation')
+    return Buffer.concat(chunks, size)
+  } finally {
+    await snapshot.close()
+  }
 }
 
 type DestinationIdentity = { readonly status: 'missing' } | ({ readonly status: 'present' } & SourceIdentity)
@@ -440,9 +477,9 @@ export class DiagnosticBundleService {
     }
   }
 
-  async uploadBundle(input: UploadInput): Promise<UploadResult> {
+  async prepareUpload(input: PrepareInput, senderId: WindowId | null): Promise<PrepareResult> {
     if (this.inFlightOperation) return { status: 'busy' }
-    const operation = this.performUpload(input)
+    const operation = this.performPrepare(input, senderId)
     this.inFlightOperation = operation
     try {
       return await operation
@@ -451,9 +488,19 @@ export class DiagnosticBundleService {
     }
   }
 
-  async retryUpload(input: RetryUploadInput): Promise<RetryUploadResult> {
+  async uploadBundle(input: UploadInput, senderId: WindowId | null): Promise<UploadResult> {
     if (this.inFlightOperation) return { status: 'busy' }
-    const operation = this.performRetryUpload(input)
+    const retained = this.getRetainedUpload(input.bundleId, senderId)
+    if (input.confirmed !== true) throw new Error('Diagnostic upload requires confirmation')
+    retained.confirmed = true
+    return this.retryUpload(input, senderId)
+  }
+
+  async retryUpload(input: RetryUploadInput, senderId: WindowId | null): Promise<RetryUploadResult> {
+    if (this.inFlightOperation) return { status: 'busy' }
+    const retained = this.getRetainedUpload(input.bundleId, senderId)
+    if (!retained.confirmed) throw new Error('Diagnostic upload requires confirmation')
+    const operation = this.performRetryUpload(input, retained)
     this.inFlightOperation = operation
     try {
       return await operation
@@ -473,8 +520,12 @@ export class DiagnosticBundleService {
     }
   }
 
-  async discardUpload(input: DiscardUploadInput): Promise<DiscardUploadResult> {
+  async discardUpload(input: DiscardUploadInput, senderId: WindowId | null): Promise<DiscardUploadResult> {
     if (this.inFlightOperation) return { status: 'busy' }
+    const retained = this.retainedUploads.get(input.bundleId)
+    if (retained && (!senderId || retained.owner !== senderId)) {
+      throw new IpcError(diagnosticsErrorCodes.RETRY_NOT_AVAILABLE, 'Prepared diagnostic bundle is unavailable')
+    }
     const operation = this.performDiscardUpload(input)
     this.inFlightOperation = operation
     try {
@@ -482,6 +533,36 @@ export class DiagnosticBundleService {
     } finally {
       if (this.inFlightOperation === operation) this.inFlightOperation = null
     }
+  }
+
+  private getRetainedUpload(bundleId: string, senderId: WindowId | null): RetainedUpload {
+    const retained = this.retainedUploads.get(bundleId)
+    if (
+      !retained ||
+      !senderId ||
+      retained.owner !== senderId ||
+      Date.now() - retained.createdAt > PREPARED_UPLOAD_LIFETIME_MS
+    ) {
+      throw new IpcError(diagnosticsErrorCodes.RETRY_NOT_AVAILABLE, 'Prepared diagnostic bundle is unavailable')
+    }
+    return retained
+  }
+
+  async previewEntry(
+    input: InputFor<'diagnostics.bundle.preview_entry'>,
+    senderId: WindowId | null
+  ): Promise<OutputFor<'diagnostics.bundle.preview_entry'>> {
+    const retained = this.getRetainedUpload(input.bundleId, senderId)
+    if (!retained.entries.some((entry) => entry.name === input.name))
+      throw new Error('Unknown diagnostic preview entry')
+    const entry = new AdmZip(retained.fileBytes).getEntry(input.name)
+    if (!entry || entry.header.size > MAX_PREPARED_ARCHIVE_BYTES) throw new Error('Invalid diagnostic preview entry')
+    const content = await new Promise<Buffer>((resolve, reject) => {
+      entry.getDataAsync((data, error) => (error ? reject(error) : resolve(data)))
+    })
+    const text = content.toString('utf8')
+    const end = input.offset + PREVIEW_PAGE_CHARACTERS
+    return { text: text.slice(input.offset, end), nextOffset: end < text.length ? end : null }
   }
 
   async refreshReport(reportId: string): Promise<OutputFor<'diagnostics.report.refresh'>> {
@@ -571,7 +652,16 @@ export class DiagnosticBundleService {
     }
   }
 
-  private async performUpload(input: UploadInput): Promise<UploadResult> {
+  private async performPrepare(input: PrepareInput, senderId: WindowId | null): Promise<PrepareResult> {
+    if (!senderId || !application.get('WindowManager').getWindow(senderId))
+      throw new Error('Diagnostic preparation requires a managed window')
+    for (const [id, retained] of this.retainedUploads) {
+      if (Date.now() - retained.createdAt > PREPARED_UPLOAD_LIFETIME_MS) {
+        this.retainedUploads.delete(id)
+        await this.cleanupTemporaryUpload(retained.bundle)
+      }
+    }
+    if (this.retainedUploads.size >= 3) return { status: 'busy' }
     const description = normalizeDiagnosticDescription(input.description.trim())
     const createdAt = new Date()
     const bundleId = randomUUID()
@@ -615,19 +705,12 @@ export class DiagnosticBundleService {
         throw new IpcError(diagnosticsErrorCodes.BUNDLE_BUILD_FAILED, 'Failed to build diagnostic bundle')
       }
 
-      const uploadResult = await cherryDiagnosticUploadClient.upload({
-        description,
-        fileName: bundle.fileName,
-        filePath: bundle.filePath
-      })
-      if (uploadResult.status === 'uploaded') {
-        return this.recordSuccessfulUpload(
-          uploadResult.reportId,
-          uploadResult.processingStatus ?? null,
-          uploadResult.submittedAt
-        )
-      }
-
+      const fileBytes = await readPreparedArchive(bundle.filePath)
+      const fileSha256 = createHash('sha256').update(fileBytes).digest('hex')
+      const entries = new AdmZip(fileBytes)
+        .getEntries()
+        .filter((entry) => !entry.isDirectory)
+        .map((entry) => ({ name: entry.entryName, bytes: entry.header.size }))
       const retainedBundle: RetainedUploadBundle = {
         bundleId: bundle.bundleId,
         fileName: bundle.fileName,
@@ -639,23 +722,24 @@ export class DiagnosticBundleService {
         bundle: retainedBundle,
         description,
         uploadFileName: bundle.fileName,
-        ...(uploadResult.fileSha256 ? { fileSha256: uploadResult.fileSha256 } : {})
+        fileBytes,
+        fileSha256,
+        entries,
+        owner: senderId,
+        createdAt: Date.now(),
+        confirmed: false
       })
       retainTempRoot = true
-      if (uploadResult.status === 'submission_unknown') {
-        logger.warn('Diagnostic bundle submission result is unknown')
-        return {
-          bundleId: bundle.bundleId,
-          fileName: bundle.fileName,
-          status: 'submission_unknown'
-        }
-      }
-      logger.warn('Diagnostic bundle submission failed', { reason: uploadResult.reason })
       return {
         bundleId: bundle.bundleId,
         fileName: bundle.fileName,
-        reason: uploadResult.reason,
-        status: 'submission_failed'
+        status: 'prepared',
+        description,
+        destination: DIAGNOSTIC_REPORT_BASE_URL,
+        archiveBytes: fileBytes.length,
+        fileSha256,
+        entries,
+        hasWarnings: bundle.hasWarnings
       }
     } finally {
       if (!retainTempRoot) {
@@ -668,20 +752,13 @@ export class DiagnosticBundleService {
     }
   }
 
-  private async performRetryUpload(input: RetryUploadInput): Promise<RetryUploadResult> {
-    const retained = this.retainedUploads.get(input.bundleId)
-    if (!retained) {
-      throw new IpcError(
-        diagnosticsErrorCodes.RETRY_NOT_AVAILABLE,
-        'Diagnostic bundle is not available for retry in this process'
-      )
-    }
-
+  private async performRetryUpload(input: RetryUploadInput, retained: RetainedUpload): Promise<RetryUploadResult> {
     const uploadResult = await cherryDiagnosticUploadClient.upload({
       description: retained.description,
       ...(retained.fileSha256 ? { expectedFileSha256: retained.fileSha256 } : {}),
       fileName: retained.uploadFileName,
-      filePath: retained.bundle.filePath
+      filePath: retained.bundle.filePath,
+      fileBytes: retained.fileBytes
     })
     if (uploadResult.status === 'uploaded') {
       this.retainedUploads.delete(input.bundleId)
@@ -710,13 +787,7 @@ export class DiagnosticBundleService {
   }
 
   private async performSaveUpload(input: SaveUploadInput, senderId: WindowId | null): Promise<SaveUploadResult> {
-    const retained = this.retainedUploads.get(input.bundleId)
-    if (!retained) {
-      throw new IpcError(
-        diagnosticsErrorCodes.RETRY_NOT_AVAILABLE,
-        'Diagnostic bundle is not available in this process'
-      )
-    }
+    const retained = this.getRetainedUpload(input.bundleId, senderId)
     if (retained.bundle.location === 'saved') {
       return {
         bundleId: retained.bundle.bundleId,
@@ -746,7 +817,7 @@ export class DiagnosticBundleService {
       if (resolvedDestination === resolvedTempRoot || isPathInside(resolvedDestination, resolvedTempRoot)) {
         throw new Error('Diagnostic upload cannot be saved inside its temporary directory')
       }
-      await move(temporaryBundle.filePath, destination)
+      await atomicWriteFile(destination, retained.fileBytes, { mode: 0o600 })
       retained.bundle = {
         bundleId: temporaryBundle.bundleId,
         fileName: path.basename(destination),

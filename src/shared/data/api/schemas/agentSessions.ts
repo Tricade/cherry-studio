@@ -28,6 +28,7 @@ export const SessionNameEntitySchema = z.string().max(255)
 export const AgentSessionEntitySchema = z.strictObject({
   id: z.string(),
   agentId: z.string().nullable(),
+  projectId: z.string().min(1).optional(),
   /** May be empty for an untitled placeholder session, matching topic.name semantics. */
   name: SessionNameEntitySchema,
   isNameManuallyEdited: z.boolean(),
@@ -49,6 +50,7 @@ export type AgentSessionEntity = z.infer<typeof AgentSessionEntitySchema>
 // Create requires a real `agentId` — orphans only happen via cascade, never on insert.
 export const CreateAgentSessionSchema = z.strictObject({
   agentId: z.string().min(1),
+  projectId: z.string().min(1).optional(),
   name: SessionNameEntitySchema,
   description: z.string().optional(),
   workspace: AgentSessionWorkspaceSourceSchema
@@ -79,6 +81,7 @@ export const ListAgentSessionsQuerySchema = z.strictObject({
   ids: z.array(z.string().min(1)).min(1).max(200).optional(),
   agentId: z.string().optional(),
   workspaceId: z.string().min(1).optional(),
+  projectId: z.string().min(1).optional(),
   cursor: z.string().optional(),
   limit: z.coerce.number().int().positive().max(200).optional(),
   /** `true` lists only trashed sessions; omitted/false lists active sessions. */

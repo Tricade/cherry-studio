@@ -63,13 +63,14 @@ export interface ToolContext {
   // useAgent(session.agentId). agentType drives the builtin slash command fallback; slashCommands
   // carries the live SDK catalog (custom commands included) when the runtime has reported it.
   session?: {
+    projectId?: string
     agentId?: string
     sessionId?: string
     agentType?: string
     tools?: Array<{ id: string; name: string; type: string; description?: string }>
     accessiblePaths?: readonly AbsoluteFilePath[]
     slashCommands?: SlashCommand[]
-    /** Knowledge bases statically bound to the Agent. */
+    /** Effective static knowledge binding, owned by the project when present. */
     knowledgeBaseIds?: readonly string[]
   }
 }

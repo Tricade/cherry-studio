@@ -134,8 +134,32 @@ describe('CherryDiagnosticUploadClient', () => {
     await rm(workDir, { force: true, recursive: true })
   })
 
-  it('exports a named direct-import singleton', () => {
-    expect(cherryDiagnosticUploadClient).toBeInstanceOf(CherryDiagnosticUploadClient)
+  it('sends the exact prepared bytes even when the archive path has changed', async () => {
+    await writeFile(filePath, 'replacement file')
+    await expect(
+      cherryDiagnosticUploadClient.upload({
+        description: 'Reviewed report',
+        fileName: 'diagnostics.zip',
+        filePath: AbsoluteFilePathSchema.parse(filePath),
+        fileBytes: ZIP_BYTES,
+        expectedFileSha256: SIGNATURE_HEADERS['X-File-SHA256']
+      })
+    ).resolves.toEqual(uploadedResult())
+    const body = fetchMock.mock.calls[0][1]!.body as FormData
+    expect(Buffer.from(await (body.get('file') as Blob).arrayBuffer())).toEqual(ZIP_BYTES)
+  })
+
+  it('rejects changed prepared bytes before sending a request', async () => {
+    await expect(
+      client.upload({
+        description: 'Reviewed report',
+        fileName: 'diagnostics.zip',
+        filePath: AbsoluteFilePathSchema.parse(filePath),
+        fileBytes: Buffer.from('changed'),
+        expectedFileSha256: SIGNATURE_HEADERS['X-File-SHA256']
+      })
+    ).resolves.toEqual({ status: 'rejected', reason: 'invalid_archive' })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('posts one signed ZIP multipart body with one normalized description', async () => {

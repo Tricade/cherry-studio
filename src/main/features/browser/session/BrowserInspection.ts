@@ -1,7 +1,5 @@
 import type { Protocol } from 'devtools-protocol'
 
-import { redactUrlParams } from '@shared/utils/redaction'
-
 import { sanitizeSnapshotUrl } from '../snapshot/serializeSnapshot'
 import type { CdpEvent } from './cdpAllowList'
 
@@ -27,7 +25,7 @@ interface NetworkRequest {
 }
 
 function sanitizeInspectionUrl(input: string): string {
-  return redactUrlParams(sanitizeSnapshotUrl(input), ['code', 'signature'])
+  return sanitizeSnapshotUrl(input)
 }
 
 function remoteText(arg: Protocol.Runtime.RemoteObject): string {

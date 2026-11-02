@@ -4,6 +4,7 @@ import path from 'node:path'
 import { application } from '@application'
 import { hasPendingRestore } from '@data/db/restore/restoreJournal'
 import { agentTable } from '@data/db/schemas/agent'
+import { agentProjectTable } from '@data/db/schemas/agentProject'
 import { agentWorkspaceTable } from '@data/db/schemas/agentWorkspace'
 import { agentSessionMessageService } from '@data/services/AgentSessionMessageService'
 import { loggerService } from '@logger'
@@ -11,6 +12,7 @@ import { listEntries, reclaimStale } from '@main/ai/runtime/orphanSessionReclaim
 import { runtimeDriverRegistry } from '@main/ai/runtime/registry'
 import type { OrphanSessionReclaimOptions } from '@main/ai/runtime/types'
 
+import { assertAgentStorageDirectory } from './agentDataDirectory'
 import { WORKSPACE_STORAGE_SUFFIXES } from './agentWorkspaceStorage'
 import { agentWorkspaceStorageService } from './AgentWorkspaceStorageService'
 
@@ -62,6 +64,14 @@ export async function sweepAgentOrphans(signal?: AbortSignal): Promise<AgentSwee
   const options: OrphanSessionReclaimOptions = { freshnessGateMs: FRESHNESS_GATE_MS, now: Date.now() }
   const agentsRoot = application.getPath('feature.agents.data')
   const workspacesRoot = application.getPath('feature.agents.system_workspaces')
+  const projectsRoot = application.getPath('feature.projects.data')
+  const projectIds = new Set(
+    db
+      .select({ id: agentProjectTable.id })
+      .from(agentProjectTable)
+      .all()
+      .map(({ id }) => id)
+  )
 
   const agentIds = new Set(
     db
@@ -81,6 +91,24 @@ export async function sweepAgentOrphans(signal?: AbortSignal): Promise<AgentSwee
   const removed: string[] = []
   let agentDirs = 0
   let workspaceDirs = 0
+  let projectDirs = 0
+
+  const projectEntries = await listEntries(projectsRoot)
+  if (projectEntries.length) await assertAgentStorageDirectory(projectsRoot, projectsRoot)
+  for (const entry of projectEntries) {
+    signal?.throwIfAborted()
+    if (!entry.isDirectory() || !AGENT_DIR_NAME.test(entry.name)) continue
+    const projectPath = path.resolve(projectsRoot, entry.name)
+    if (!projectIds.has(entry.name)) {
+      if (await reclaim(projectPath, removed, options)) projectDirs++
+      continue
+    }
+    for (const agentEntry of await listEntries(projectPath)) {
+      signal?.throwIfAborted()
+      if (!agentEntry.isDirectory() || !AGENT_DIR_NAME.test(agentEntry.name) || agentIds.has(agentEntry.name)) continue
+      if (await reclaim(path.resolve(projectPath, agentEntry.name), removed, options)) agentDirs++
+    }
+  }
 
   for (const entry of await listEntries(agentsRoot)) {
     // Per entry: the roots can hold thousands of dirs, and a recursive rm is slow
@@ -129,7 +157,13 @@ export async function sweepAgentOrphans(signal?: AbortSignal): Promise<AgentSwee
   signal?.throwIfAborted()
   const { runtimeSessions, failedDrivers } = await reclaimRuntimeSessions(removed, options, signal)
 
-  logger.info('agent-orphan-sweep', { event: 'agent-orphan-sweep', agentDirs, workspaceDirs, runtimeSessions })
+  logger.info('agent-orphan-sweep', {
+    event: 'agent-orphan-sweep',
+    agentDirs,
+    projectDirs,
+    workspaceDirs,
+    runtimeSessions
+  })
   return { removed, failedDrivers }
 }
 

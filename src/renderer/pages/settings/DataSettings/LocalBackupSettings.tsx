@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { Button, Input, RowFlex, Switch, WarnTooltip } from '@cherrystudio/ui'
 import { usePreference } from '@data/hooks/usePreference'
 import { loggerService } from '@logger'
+import { BackupDisclosure } from '@renderer/components/BackupDisclosure'
 import { LocalBackupManager } from '@renderer/components/LocalBackupManager'
 import { LocalBackupModal, useLocalBackupModal } from '@renderer/components/LocalBackupModals'
 import Selector from '@renderer/components/Selector'
@@ -189,6 +190,7 @@ const LocalBackupSettings: React.FC = () => {
   return (
     <SettingGroup theme={theme}>
       <SettingTitle>{t('settings.data.local.title')}</SettingTitle>
+      <BackupDisclosure target="local" />
       <SettingDivider />
       <SettingRow id="setting-data-local-backup-directory" className="scroll-mt-6">
         <SettingRowTitle>{t('settings.data.local.directory.label')}</SettingRowTitle>

@@ -13,8 +13,8 @@ import { getRetiredAgentSessionMigration } from '@data/services/retiredAgentRunt
 import { loggerService } from '@logger'
 import { AgentSessionForkOperations } from '@main/ai/agentSession/fork'
 import type { NotifyChannel } from '@main/ai/runtime/agentMcpServers'
+import { getAgentProjectContext, resolveAgentProjectKnowledgeScope } from '@main/ai/runtime/agentProjectContext'
 import type { RuntimeForkAnchor } from '@main/ai/runtime/fork'
-import { resolveKnowledgeBaseScope } from '@main/ai/utils/knowledgeScope'
 import { serializeError } from '@main/ai/utils/serializeError'
 import { createAiUsageCaptureContext } from '@main/ai/utils/usageCapture'
 import {
@@ -1000,14 +1000,17 @@ export class AgentSessionRuntimeService extends BaseService {
     // message: a changed effective connection scope must queue as the NEXT turn instead of being
     // folded into a query already running with different tools.
     const configuredKnowledgeBaseIds = agentService.getAgent(entry.agentId)?.knowledgeBaseIds
+    const session = agentSessionService.getById(entry.sessionId)
+    const project = getAgentProjectContext(session, entry.agentId)
     const canRedirectOnCurrentConfig =
+      !project &&
       turn?.modelId === entry.modelId &&
       turn.reasoningEffort === reasoningEffort &&
       turn.serviceTier === serviceTier &&
       turn.fastMode === fastMode &&
       knowledgeScopeEquals(
-        resolveKnowledgeBaseScope(configuredKnowledgeBaseIds, turn.knowledgeBaseIds),
-        resolveKnowledgeBaseScope(configuredKnowledgeBaseIds, knowledgeBaseIds)
+        resolveAgentProjectKnowledgeScope(project, configuredKnowledgeBaseIds, turn.knowledgeBaseIds),
+        resolveAgentProjectKnowledgeScope(project, configuredKnowledgeBaseIds, knowledgeBaseIds)
       )
     if (
       entry.runtimeState.execution.kind === 'turn' &&
@@ -1699,14 +1702,15 @@ export class AgentSessionRuntimeService extends BaseService {
     const agent = agentService.getAgent(entry.agentId)
     const current = this.connectionTarget(entry, agent)
     const configuredKnowledgeBaseIds = agent?.knowledgeBaseIds
+    const project = getAgentProjectContext(agentSessionService.getById(entry.sessionId), entry.agentId)
     return (
       current.modelId === target.modelId &&
       current.reasoningEffort === target.reasoningEffort &&
       current.serviceTier === target.serviceTier &&
       current.fastMode === target.fastMode &&
       knowledgeScopeEquals(
-        resolveKnowledgeBaseScope(configuredKnowledgeBaseIds, current.knowledgeBaseIds),
-        resolveKnowledgeBaseScope(configuredKnowledgeBaseIds, target.knowledgeBaseIds)
+        resolveAgentProjectKnowledgeScope(project, configuredKnowledgeBaseIds, current.knowledgeBaseIds),
+        resolveAgentProjectKnowledgeScope(project, configuredKnowledgeBaseIds, target.knowledgeBaseIds)
       ) &&
       notifyChannelsEqual(current.trustedNotifyChannels, target.trustedNotifyChannels)
     )

@@ -42,6 +42,7 @@ export function createGuest(id = 1) {
       capturing = false
     }),
     isDevToolsOpened: vi.fn(() => false),
+    sendInputEvent: vi.fn<(event: Electron.KeyboardInputEvent) => void>(),
     getTitle: vi.fn(() => 'Test page'),
     getURL: vi.fn(() => 'https://example.com'),
     close: vi.fn(() => {
