@@ -201,7 +201,7 @@ const CROSS_CUTTING_TOOL_GUARD_RULES: readonly ToolGuardRule[] = [
     match: {
       when: (ctx) =>
         findBuiltinToolPolicy(ctx.toolName, ctx.mountedServers)?.approval === 'delegation' &&
-        resolveDelegationApproval(ctx.permissionMode, ctx.interaction) !== 'allow'
+        resolveDelegationApproval(ctx.permissionMode, ctx.interaction, ctx.toolName) !== 'allow'
           ? {}
           : null
     },

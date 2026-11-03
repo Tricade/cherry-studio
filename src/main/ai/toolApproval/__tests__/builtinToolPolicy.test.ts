@@ -58,8 +58,9 @@ describe('builtinToolPolicy', () => {
     ).toBe(false)
   })
 
-  it('auto-approves Session renames only when cherry-tools is mounted', () => {
-    expect(findBuiltinToolPolicy('mcp__cherry-tools__session_rename', WITHOUT_HOST_TOOLS)?.approval).toBe('auto')
-    expect(findBuiltinToolPolicy('mcp__cherry-tools__session_rename', new Set())).toBeUndefined()
+  it.each(['session_read', 'session_search', 'session_rename'])('uses the delegation approval mode for %s', (name) => {
+    const runtimeName = `mcp__cherry-tools__${name}`
+    expect(findBuiltinToolPolicy(runtimeName, WITHOUT_HOST_TOOLS)?.approval).toBe('delegation')
+    expect(findBuiltinToolPolicy(runtimeName, new Set())).toBeUndefined()
   })
 })

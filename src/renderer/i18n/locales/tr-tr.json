@@ -3197,7 +3197,7 @@
   "privacy_policy_update.policy": "Gizlilik Politikası",
   "privacy_policy_update.title": "Gizlilik Politikası Güncellendi",
   "project.agents": "Ekip üyeleri",
-  "project.agents_hint": "Mevcut ajanları seçin. Her biri yapılandırılmış rolünü ve modelini korur. Herhangi bir üyeyle ayrı bir sohbet başlatın; ekip oluşturmak otomatik bir iş akışı başlatmaz.",
+  "project.agents_hint": "Mevcut ajanları kendi rolleri ve modelleriyle seçin. Ekibi yönetecek ajanla sohbeti başlatın. Bu ajan görev dağıtabilir, yanıtları inceleyebilir ve düzeltme isteyebilir. Her ajanın izin modu ekip sohbetlerine erişimini belirler.",
   "project.choose_workspace": "Bir klasör seçin veya ekleyin",
   "project.delete": "Projeyi sil",
   "project.delete_confirm": "Projenin silinmesini onayla",

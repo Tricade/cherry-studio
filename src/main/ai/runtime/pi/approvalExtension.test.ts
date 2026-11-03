@@ -316,58 +316,79 @@ describe('createPiApprovalExtension — policy + approval gate', () => {
     expect(toolApprovalRegistry.size()).toBe(0)
   })
 
-  describe.each(['session_create', 'session_send'])('delegation: %s', (name) => {
-    const toolName = `mcp__cherry-tools__${name}`
-    const delegationTools = new Set([toolName])
+  describe.each(['session_create', 'session_send', 'session_read', 'session_search', 'session_rename'])(
+    'delegation: %s',
+    (name) => {
+      const toolName = `mcp__cherry-tools__${name}`
+      const delegationTools = new Set([toolName])
 
-    it.each(['auto', 'bypassPermissions'] as const)('allows repeated and nested calls in %s', async (mode) => {
-      const { handler, emitted, authorizeTool } = buildGate({ delegationTools, getPermissionMode: () => mode })
-      for (let call = 0; call < 2; call++) {
-        await expect(handler(toolEvent(toolName, {}), extCtx)).resolves.toBeUndefined()
-      }
-      await expect(authorizeTool({ toolName, toolCallId: 'nested-delegation', input: {} })).resolves.toBeUndefined()
-      expect(emitted).toHaveLength(0)
-      expect(toolApprovalRegistry.size()).toBe(0)
-    })
-
-    it.each(['default', 'acceptEdits'] as const)('requires a decision in %s', async (mode) => {
-      const { handler, emitted } = buildGate({ delegationTools, getPermissionMode: () => mode })
-      for (const approved of [true, false]) {
-        const pending = handler(toolEvent(toolName, {}), extCtx)
-        await flush()
-        toolApprovalRegistry.dispatch(emitted.at(-1).request.approvalId, { approved })
-        if (approved) await expect(pending).resolves.toBeUndefined()
-        else await expect(pending).resolves.toMatchObject({ block: true })
-      }
-      expect(emitted).toHaveLength(2)
-    })
-
-    it.each(['default', 'acceptEdits', 'auto', 'bypassPermissions'] as const)(
-      'keeps delegation boundaries in %s',
-      async (mode) => {
-        const { handler, emitted } = buildGate({
-          delegationTools,
-          getPermissionMode: () => mode,
-          isDisabled: () => true
-        })
-        await expect(handler(toolEvent(toolName, {}), extCtx)).resolves.toMatchObject({ block: true })
-        expect(emitted).toHaveLength(0)
-        for (const interaction of [
-          { currentTurn: 'headless', userResponse: 'unavailable' },
-          { currentTurn: 'headless', userResponse: 'stream' },
-          { currentTurn: 'interactive', userResponse: 'unavailable' }
-        ] as const) {
+      it.each(['auto', 'bypassPermissions'] as const)(
+        'limits a verified project delivery in %s to evidence',
+        async (mode) => {
           const gate = buildGate({
             delegationTools,
             getPermissionMode: () => mode,
-            getInteractionState: () => interaction
+            getInteractionState: () => ({
+              currentTurn: 'headless',
+              userResponse: 'unavailable',
+              projectDeliveryRead: true
+            })
           })
-          await expect(gate.handler(toolEvent(toolName, {}), extCtx)).resolves.toMatchObject({ block: true })
-          expect(gate.emitted).toHaveLength(0)
+          const decision = await gate.handler(toolEvent(toolName, {}), extCtx)
+          if (name === 'session_read' || name === 'session_search') expect(decision).toBeUndefined()
+          else expect(decision).toMatchObject({ block: true })
         }
-      }
-    )
-  })
+      )
+
+      it.each(['auto', 'bypassPermissions'] as const)('allows repeated and nested calls in %s', async (mode) => {
+        const { handler, emitted, authorizeTool } = buildGate({ delegationTools, getPermissionMode: () => mode })
+        for (let call = 0; call < 2; call++) {
+          await expect(handler(toolEvent(toolName, {}), extCtx)).resolves.toBeUndefined()
+        }
+        await expect(authorizeTool({ toolName, toolCallId: 'nested-delegation', input: {} })).resolves.toBeUndefined()
+        expect(emitted).toHaveLength(0)
+        expect(toolApprovalRegistry.size()).toBe(0)
+      })
+
+      it.each(['default', 'acceptEdits'] as const)('requires a decision in %s', async (mode) => {
+        const { handler, emitted } = buildGate({ delegationTools, getPermissionMode: () => mode })
+        for (const approved of [true, false]) {
+          const pending = handler(toolEvent(toolName, {}), extCtx)
+          await flush()
+          toolApprovalRegistry.dispatch(emitted.at(-1).request.approvalId, { approved })
+          if (approved) await expect(pending).resolves.toBeUndefined()
+          else await expect(pending).resolves.toMatchObject({ block: true })
+        }
+        expect(emitted).toHaveLength(2)
+      })
+
+      it.each(['default', 'acceptEdits', 'auto', 'bypassPermissions'] as const)(
+        'keeps delegation boundaries in %s',
+        async (mode) => {
+          const { handler, emitted } = buildGate({
+            delegationTools,
+            getPermissionMode: () => mode,
+            isDisabled: () => true
+          })
+          await expect(handler(toolEvent(toolName, {}), extCtx)).resolves.toMatchObject({ block: true })
+          expect(emitted).toHaveLength(0)
+          for (const interaction of [
+            { currentTurn: 'headless', userResponse: 'unavailable' },
+            { currentTurn: 'headless', userResponse: 'stream' },
+            { currentTurn: 'interactive', userResponse: 'unavailable' }
+          ] as const) {
+            const gate = buildGate({
+              delegationTools,
+              getPermissionMode: () => mode,
+              getInteractionState: () => interaction
+            })
+            await expect(gate.handler(toolEvent(toolName, {}), extCtx)).resolves.toMatchObject({ block: true })
+            expect(gate.emitted).toHaveLength(0)
+          }
+        }
+      )
+    }
+  )
 
   it('fails closed immediately when an approval-required tool has no responder', async () => {
     const { handler, emitted } = buildGate({

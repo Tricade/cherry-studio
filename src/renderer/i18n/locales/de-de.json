@@ -3197,7 +3197,7 @@
   "privacy_policy_update.policy": "Datenschutzrichtlinie",
   "privacy_policy_update.title": "Datenschutzrichtlinie aktualisiert",
   "project.agents": "Teammitglieder",
-  "project.agents_hint": "Wähle vorhandene Agenten aus. Jeder behält seine konfigurierte Rolle und sein Modell. Starte eine separate Unterhaltung mit einem beliebigen Mitglied; durch das Erstellen eines Teams wird kein automatischer Ablauf gestartet.",
+  "project.agents_hint": "Wähle vorhandene Agenten mit ihren eigenen Rollen und Modellen. Starte den Chat mit dem Agenten, der das Team leiten soll. Er kann Aufgaben verteilen, Antworten prüfen und Änderungen anfordern. Für den Zugriff auf Teamchats gilt der Berechtigungsmodus des jeweiligen Agenten.",
   "project.choose_workspace": "Ordner auswählen oder hinzufügen",
   "project.delete": "Projekt löschen",
   "project.delete_confirm": "Löschen des Projekts bestätigen",

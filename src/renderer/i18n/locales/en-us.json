@@ -3197,7 +3197,7 @@
   "privacy_policy_update.policy": "Privacy Policy",
   "privacy_policy_update.title": "Privacy Policy Updated",
   "project.agents": "Team members",
-  "project.agents_hint": "Select existing agents. Each keeps its configured role and model. Start a separate conversation with any member; creating a team does not start an automatic workflow.",
+  "project.agents_hint": "Choose existing agents with their own roles and models. Start the chat with the agent you want to lead. It can assign tasks, review replies and request changes. Each agent’s permission mode governs access to team chats.",
   "project.choose_workspace": "Choose or add a folder",
   "project.delete": "Delete project",
   "project.delete_confirm": "Confirm project deletion",
