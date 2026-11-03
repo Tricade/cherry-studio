@@ -1,5 +1,0 @@
-# Bilingual-pair consistency record (docs/dev/i18n/README.md).
-# After editing either side, update its counterpart and re-record with:
-#   pnpm docs:check-pairing --write .agents/notes/proposed/feature/2026-11-03-german-offline-voice.md
-2026-11-03-german-offline-voice.md: 26add262f67c2f69f81ac045b48d323eb2691313
-2026-11-03-german-offline-voice.zh.md: 14ced38e5d698fd4e2b32db134c2ca22316c640d
