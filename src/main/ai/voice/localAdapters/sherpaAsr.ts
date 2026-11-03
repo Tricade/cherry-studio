@@ -7,20 +7,26 @@ import { application } from '@application'
 import type { TranscriptionOptions } from '@cherrystudio/ai-core'
 import { loggerService } from '@logger'
 import { UtilityProcessError } from '@main/core/utilityProcess/UtilityProcessError'
-import { regionService } from '@main/services/RegionService'
-import { FUNASR_SUPPORTED_PLATFORM_KEYS } from '@shared/ai/localVoice'
-import { LOCAL_VOICE_MODELS, VoiceModelSupport, VoiceResourceOperation } from '@shared/ai/localVoice'
-import { FUNASR_MODEL_ID, FUNASR_BUNDLE_ID } from '@shared/ai/localVoice'
-import { LOCAL_MODEL_STATUS_CACHE_KEY } from '@shared/data/presets/localModel'
+import {
+  DOWNLOADABLE_TRANSCRIPTION_BUNDLES,
+  FUNASR_MODEL_ID,
+  LOCAL_VOICE_MODELS,
+  WHISPER_ASR_MODEL_ID
+} from '@shared/ai/localVoice'
 
 import type { TranscriptionModelDefinition } from '../voiceModelTypes'
-import type { LocalVoiceStatus } from '../voiceModelTypes'
-import type { VoiceEnvironment } from '../voicePlatform'
 import { checkAbort, VoiceRuntimeError } from '../VoiceRuntimeError'
 import { inspectCanonicalWav } from './inspectCanonicalWav'
 import { decodeVoiceRecording } from './recordingDecoder'
 import { withScratch } from './scratch'
 import { completeTranscriptionOperation } from './sdkOperations'
+import { sherpaBundleOperations, sherpaBundleStatus, sherpaResources, sherpaVoiceSupport } from './sherpaResources'
+
+type SherpaAsrId = typeof FUNASR_MODEL_ID | typeof WHISPER_ASR_MODEL_ID
+
+function supportsLanguage(modelId: SherpaAsrId, language?: string) {
+  return !language || (modelId === WHISPER_ASR_MODEL_ID && /^de(?:-|$)/i.test(language))
+}
 
 const ASR_INFERENCE_TIMEOUT_MS = 120_000
 // Deadline ceiling for recordings longer than the fixed floor: twice the audio
@@ -51,46 +57,24 @@ function normalizeFailure(error: unknown, signal?: AbortSignal): VoiceRuntimeErr
   return new VoiceRuntimeError('operation_failed')
 }
 
-export function getFunAsrStatus(signal?: AbortSignal): LocalVoiceStatus {
-  checkAbort(signal)
-  const { status } = application.get('LocalModelService').refreshStatus(FUNASR_BUNDLE_ID)
-  switch (status) {
-    case 'not_downloaded':
-      return { status: 'not_installed', reason: 'model_required' }
-    case 'downloading':
-      return {
-        status: 'installing',
-        reason: 'model_required',
-        percent:
-          application.get('CacheService').getShared(LOCAL_MODEL_STATUS_CACHE_KEY)?.[FUNASR_BUNDLE_ID]?.percent ?? 0
-      }
-    case 'ready':
-      return { status: 'ready' }
-    case 'error':
-      return { status: 'failed', reason: 'download_failed' }
-    case 'unsupported':
-      return { status: 'unsupported', reason: 'unsupported' }
-  }
-}
-
-async function requireReady(signal?: AbortSignal): Promise<void> {
-  const status = getFunAsrStatus(signal)
-  if (status.status !== 'ready') throw new VoiceRuntimeError(status.reason ?? 'operation_failed')
-}
-
-export function createFunAsrTranscriptionModel(options: TranscriptionOptions): TranscriptionModelV3 {
+export function createSherpaTranscriptionModel(
+  modelId: SherpaAsrId,
+  options: TranscriptionOptions
+): TranscriptionModelV3 {
+  const bundleId = DOWNLOADABLE_TRANSCRIPTION_BUNDLES[modelId]
   return {
     specificationVersion: 'v3',
     provider: 'local-voice',
-    modelId: FUNASR_MODEL_ID,
+    modelId,
     async doGenerate(input) {
-      if (options.language) throw new VoiceRuntimeError('invalid_request')
+      if (!supportsLanguage(modelId, options.language)) throw new VoiceRuntimeError('invalid_request')
       if (!(input.audio instanceof Uint8Array)) throw new VoiceRuntimeError('invalid_audio')
       const audio = input.audio
       const isWebm = ['audio/webm', 'audio/webm;codecs=opus'].includes(input.mediaType)
       const wavMetadata = input.mediaType === 'audio/wav' ? inspectCanonicalWav(audio) : undefined
       if (!isWebm && !wavMetadata) throw new VoiceRuntimeError('invalid_audio')
-      await requireReady(input.abortSignal)
+      const status = sherpaBundleStatus(bundleId, input.abortSignal)
+      if (status.status !== 'ready') throw new VoiceRuntimeError(status.reason ?? 'operation_failed')
       return withScratch(
         async (directory) => {
           let wavBytes: Uint8Array
@@ -118,14 +102,14 @@ export function createFunAsrTranscriptionModel(options: TranscriptionOptions): T
             : inferenceTimeout
           const transcript = await application
             .get('AsrInferenceService')
-            .transcribe(FUNASR_BUNDLE_ID, { kind: 'wav', filePath: inputPath }, inferenceSignal)
+            .transcribe(bundleId, { kind: 'wav', filePath: inputPath }, inferenceSignal)
             .catch((error: unknown) => {
               if (inferenceTimeout.aborted && !input.abortSignal?.aborted) throw new VoiceRuntimeError('timeout')
               throw error
             })
           checkAbort(input.abortSignal)
           logger.debug('Local transcription completed', {
-            modelId: FUNASR_MODEL_ID,
+            modelId,
             status: 'completed',
             durationSeconds,
             segmentCount: transcript.segments.length,
@@ -138,10 +122,10 @@ export function createFunAsrTranscriptionModel(options: TranscriptionOptions): T
               startSecond: segment.start,
               endSecond: segment.end
             })),
-            language: undefined,
+            language: modelId === WHISPER_ASR_MODEL_ID ? 'de' : undefined,
             durationInSeconds: durationSeconds,
             warnings: [],
-            response: { timestamp: new Date(), modelId: FUNASR_MODEL_ID }
+            response: { timestamp: new Date(), modelId }
           }
         },
         input.abortSignal,
@@ -151,34 +135,33 @@ export function createFunAsrTranscriptionModel(options: TranscriptionOptions): T
   }
 }
 
-export const funAsrTranscriptionDefinition: TranscriptionModelDefinition = {
-  id: FUNASR_MODEL_ID,
-  adapterId: 'funasr',
-  support: (environment: VoiceEnvironment) =>
-    FUNASR_SUPPORTED_PLATFORM_KEYS.some((key) => key === `${environment.platform}-${environment.arch}`)
-      ? VoiceModelSupport.Supported
-      : ['darwin', 'win32', 'linux'].includes(environment.platform)
-        ? VoiceModelSupport.UnsupportedArchitecture
-        : VoiceModelSupport.UnsupportedPlatform,
-  describe: () => ({
-    ...LOCAL_VOICE_MODELS.find((model) => model.id === FUNASR_MODEL_ID)!,
-    localeSelection: null,
-    resourceOperations: [
-      VoiceResourceOperation.Download,
-      VoiceResourceOperation.CancelDownload,
-      VoiceResourceOperation.Remove
-    ]
-  }),
-  status: (_options, signal) => getFunAsrStatus(signal),
-  locales: async () => ({ supported: [], installed: [] }),
-  transcriptionOperations: [completeTranscriptionOperation(createFunAsrTranscriptionModel)],
-  download: () =>
-    application
-      .get('LocalModelService')
-      .download(FUNASR_BUNDLE_ID, async () => ((await regionService.isInChina()) ? 'china-first' : 'global-first'))
-      .catch(() => {
-        throw new VoiceRuntimeError('download_failed')
-      }),
-  cancelDownload: () => application.get('LocalModelService').cancel(FUNASR_BUNDLE_ID),
-  remove: () => application.get('LocalModelService').remove(FUNASR_BUNDLE_ID)
+function transcriptionDefinition(id: SherpaAsrId): TranscriptionModelDefinition {
+  const bundleId = DOWNLOADABLE_TRANSCRIPTION_BUNDLES[id]
+  return {
+    id,
+    adapterId: id === FUNASR_MODEL_ID ? 'funasr' : 'whisper',
+    support: sherpaVoiceSupport,
+    describe: () => ({
+      ...LOCAL_VOICE_MODELS.find((model) => model.id === id)!,
+      localeSelection: id === WHISPER_ASR_MODEL_ID ? { defaultLocale: 'de-DE' } : null,
+      resourceOperations: sherpaResources
+    }),
+    status: ({ language }, signal) =>
+      supportsLanguage(id, language)
+        ? sherpaBundleStatus(bundleId, signal)
+        : { status: 'unsupported', reason: 'unsupported' },
+    locales: async (signal) => {
+      checkAbort(signal)
+      if (id !== WHISPER_ASR_MODEL_ID) return { supported: [], installed: [] }
+      return {
+        supported: ['de-DE'],
+        installed: sherpaBundleStatus(bundleId, signal).status === 'ready' ? ['de-DE'] : []
+      }
+    },
+    transcriptionOperations: [completeTranscriptionOperation((options) => createSherpaTranscriptionModel(id, options))],
+    ...sherpaBundleOperations(bundleId)
+  }
 }
+
+export const funAsrTranscriptionDefinition = transcriptionDefinition(FUNASR_MODEL_ID)
+export const whisperTranscriptionDefinition = transcriptionDefinition(WHISPER_ASR_MODEL_ID)

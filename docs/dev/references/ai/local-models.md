@@ -11,7 +11,7 @@ sources:
 # Local Models
 
 Cherry Studio can run four model capabilities on the user's own machine: knowledge-base
-embedding, PaddleOCR text recognition, speech recognition with FunASR Nano or Qwen3-ASR, and speech synthesis with Qwen3-TTS or Kokoro. Their model
+embedding, PaddleOCR text recognition, speech recognition with FunASR Nano, German Whisper Small INT8 or Qwen3-ASR, and speech synthesis with Qwen3-TTS, Kokoro or German Neon CSS10. Their model
 bundles and required native runtimes are fetched on demand rather than shipped in the installer.
 
 One module owns the whole path: what can be installed, how bytes get onto disk safely,
@@ -356,6 +356,15 @@ or handler, but does require the catalog, shared vocabulary and presentation des
 The catalog's own test suite enforces the mechanical parts (checksum present and
 well-formed, keys and paths unique, `requires` resolvable), so a missed field fails in CI
 rather than on a user's machine.
+
+## German offline models
+
+German dictation and speech are independent downloads that share the Sherpa runtime. The
+Whisper preset transcribes in German and segments long recordings within its audio window.
+Neon CSS10 supplies one German character-based VITS voice at 22,050 Hz. Local model cards
+show the publisher's license and the model file download size when known. The native runtime
+is a separate first-use download. The same PaddleOCR medium bundle can recognize German,
+including umlauts and ß.
 
 ## Known limits
 

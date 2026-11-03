@@ -5,6 +5,8 @@ import mlxNodeRelease from './mlxNodeRelease.json'
 import qwen3AsrRelease from './qwen3AsrRelease.json'
 import sherpaRuntimeRelease from './sherpaRuntimeRelease.json'
 import type { ModelBundle, SharedArtifact, SharedArtifactId } from './types'
+import vitsGerman from './vits-css10-de.json'
+import whisperGerman from './whisper-small-de.json'
 
 /**
  * Single source of truth for everything installable locally: which bundles exist,
@@ -196,7 +198,97 @@ export const SHARED_ARTIFACTS = {
   }
 } as const satisfies Record<SharedArtifactId, SharedArtifact>
 
+const sileroVad = {
+  key: 'voiceActivityDetector',
+  relPath: 'silero_vad.onnx',
+  sha256: 'a35ebf52fd3ce5f1469b2a36158dba761bc47b973ea3382b3186ca15b1f5af28',
+  sizeBytes: 1_807_522,
+  minBytes: 1_000_000,
+  weight: 2,
+  sources: [
+    {
+      source: 'huggingface',
+      repo: 'csukuangfj/vad',
+      revision: 'fba88cd2e921609e7675c3aaf51e0b9b295da4bc',
+      remoteFile: 'silero_vad.onnx'
+    },
+    {
+      source: 'hf-mirror',
+      repo: 'csukuangfj/vad',
+      revision: 'fba88cd2e921609e7675c3aaf51e0b9b295da4bc',
+      remoteFile: 'silero_vad.onnx'
+    }
+  ]
+} as const
+
+interface SherpaModelRelease {
+  repo: string
+  revision: string
+  files: { key: string; relPath: string; sha256: string; sizeBytes: number }[]
+}
+
+function sherpaModelFiles(release: SherpaModelRelease): ModelBundle['files'] {
+  return release.files.map((file) => ({
+    ...file,
+    minBytes: file.sizeBytes,
+    weight: Math.max(0.01, file.sizeBytes / 1_000_000),
+    sources: [
+      { source: 'huggingface', repo: release.repo, revision: release.revision, remoteFile: file.relPath },
+      { source: 'hf-mirror', repo: release.repo, revision: release.revision, remoteFile: file.relPath }
+    ]
+  }))
+}
+
 export const LOCAL_MODEL_BUNDLES = {
+  'whisper-small-de-int8': {
+    id: 'whisper-small-de-int8',
+    capability: 'asr',
+    installDirKey: 'feature.asr.whisper',
+    requires: ['sherpa-onnx'],
+    runtime: { architecture: 'whisper' },
+    provenance: {
+      license: {
+        spdx: 'MIT',
+        url: 'https://github.com/openai/whisper/blob/86098128c0b4f24f0e2aa2994de830614b474227/LICENSE'
+      },
+      upstream: { url: 'https://github.com/openai/whisper', revision: '86098128c0b4f24f0e2aa2994de830614b474227' },
+      conversion: {
+        url: 'https://huggingface.co/csukuangfj/sherpa-onnx-whisper-small',
+        revision: whisperGerman.revision,
+        license: {
+          spdx: 'MIT',
+          url: 'https://github.com/openai/whisper/blob/86098128c0b4f24f0e2aa2994de830614b474227/LICENSE'
+        }
+      }
+    },
+    files: [...sherpaModelFiles(whisperGerman), sileroVad]
+  },
+  'vits-css10-de': {
+    id: 'vits-css10-de',
+    capability: 'tts',
+    installDirKey: 'feature.tts.css10',
+    requires: ['sherpa-onnx'],
+    runtime: { architecture: 'vits' },
+    provenance: {
+      license: {
+        spdx: 'BSD-3-Clause',
+        url: 'https://huggingface.co/neongeckocom/tts-vits-css10-de/blob/408f0bf6d6d71e24c7544c9425cdc5cd82829734/README.md'
+      },
+      upstream: {
+        url: 'https://huggingface.co/neongeckocom/tts-vits-css10-de',
+        revision: '408f0bf6d6d71e24c7544c9425cdc5cd82829734'
+      },
+      conversion: {
+        url: 'https://huggingface.co/csukuangfj/vits-coqui-de-css10',
+        revision: vitsGerman.revision,
+        license: {
+          spdx: 'BSD-3-Clause',
+          url: 'https://huggingface.co/neongeckocom/tts-vits-css10-de/blob/408f0bf6d6d71e24c7544c9425cdc5cd82829734/README.md'
+        }
+      }
+    },
+    files: sherpaModelFiles(vitsGerman)
+  },
   'kokoro-multi-lang-v1.1': {
     id: 'kokoro-multi-lang-v1.1',
     capability: 'tts',
@@ -356,6 +448,16 @@ export const LOCAL_MODEL_BUNDLES = {
     capability: 'ocr',
     installDirKey: 'feature.ocr.paddleocr',
     requires: ['onnxruntime-node'],
+    provenance: {
+      license: {
+        spdx: 'Apache-2.0',
+        url: 'https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_rec_onnx/blob/50c7eacafc52fa7bcf4194e8cd08e46f8558504b/README.md'
+      },
+      upstream: {
+        url: 'https://huggingface.co/PaddlePaddle/PP-OCRv6_medium_rec_onnx',
+        revision: '50c7eacafc52fa7bcf4194e8cd08e46f8558504b'
+      }
+    },
     files: [
       {
         key: 'detection',
@@ -363,6 +465,7 @@ export const LOCAL_MODEL_BUNDLES = {
         repo: 'PaddlePaddle/PP-OCRv6_medium_det_onnx',
         remoteFile: 'inference.onnx',
         sha256: 'eb13b44b25bb36f89528b68720af8a61d9cf381176107f465db1757b65d086e1',
+        sizeBytes: 62_032_837,
         minBytes: 1_000_000,
         weight: 59
       },
@@ -372,6 +475,7 @@ export const LOCAL_MODEL_BUNDLES = {
         repo: 'PaddlePaddle/PP-OCRv6_medium_rec_onnx',
         remoteFile: 'inference.onnx',
         sha256: '9c09abf0957f7968c7586464b7397b84ad2387a0497a351af40e9acc71b673ba',
+        sizeBytes: 76_554_979,
         minBytes: 1_000_000,
         weight: 73
       },
@@ -384,6 +488,7 @@ export const LOCAL_MODEL_BUNDLES = {
         repo: 'PaddlePaddle/PP-OCRv6_medium_rec_onnx',
         remoteFile: 'inference.yml',
         sha256: '991b700facf5b50a7de193468207d5f4255b538dde0d312ae3b7c7a9b6873129',
+        sizeBytes: 150_580,
         minBytes: 10_000,
         weight: 1,
         derivation: 'paddle_dict_from_inference_yml'
@@ -573,28 +678,7 @@ export const LOCAL_MODEL_BUNDLES = {
           }
         ]
       },
-      {
-        key: 'voiceActivityDetector',
-        relPath: 'silero_vad.onnx',
-        sha256: 'a35ebf52fd3ce5f1469b2a36158dba761bc47b973ea3382b3186ca15b1f5af28',
-        sizeBytes: 1_807_522,
-        minBytes: 1_000_000,
-        weight: 2,
-        sources: [
-          {
-            source: 'huggingface',
-            repo: 'csukuangfj/vad',
-            revision: 'fba88cd2e921609e7675c3aaf51e0b9b295da4bc',
-            remoteFile: 'silero_vad.onnx'
-          },
-          {
-            source: 'hf-mirror',
-            repo: 'csukuangfj/vad',
-            revision: 'fba88cd2e921609e7675c3aaf51e0b9b295da4bc',
-            remoteFile: 'silero_vad.onnx'
-          }
-        ]
-      }
+      sileroVad
     ]
   }
 } as const satisfies Record<LocalModelBundleId, ModelBundle>

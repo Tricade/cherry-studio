@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, expect, it } from 'vitest'
 
-import { KokoroTts } from '../utilityEntries/KokoroTts'
+import { SherpaTts } from '../utilityEntries/SherpaTts'
 
 let directory: string
 const originalEspeakDataPath = process.env.ESPEAK_DATA_PATH
@@ -25,6 +25,10 @@ it('generates a WAV through the sandbox-compatible Sherpa contract with both lex
     const fs = require('node:fs');
     module.exports = {
       OfflineTts: { createAsync: async config => {
+        if (config.model.vits) return { generate: request => {
+          if (request.sid !== 0 || request.enableExternalBuffer !== false) throw Error('Invalid German voice request');
+          return { samples: new Float32Array([0, 0.5]), sampleRate: 22050 };
+        }};
         const lexicon = config.model.kokoro.lexicon;
         if (!lexicon.includes('lexicon-zh.txt') || !lexicon.includes('lexicon-us-en.txt') || config.model.kokoro.lang)
           throw Error('Mixed language frontend unavailable');
@@ -49,7 +53,8 @@ it('generates a WAV through the sandbox-compatible Sherpa contract with both lex
   `
   )
   const outputPath = join(directory, 'speech.wav')
-  await new KokoroTts(directory).synthesize(
+  const runtime = new SherpaTts(directory)
+  await runtime.synthesize(
     {
       architecture: 'kokoro',
       modelDir: directory,
@@ -67,4 +72,17 @@ it('generates a WAV through the sandbox-compatible Sherpa contract with both lex
   expect(audio.readUInt32LE(24)).toBe(24000)
   expect(audio.readUInt32LE(4) + 8).toBe(audio.length)
   expect(audio.readUInt32LE(40)).toBeGreaterThan(0)
+  await runtime.synthesize(
+    {
+      architecture: 'vits',
+      modelDir: join(directory, 'css10'),
+      text: 'Grüße aus Köln',
+      voice: '0',
+      language: 'de-DE',
+      speed: 1,
+      outputPath
+    },
+    new AbortController().signal
+  )
+  expect((await readFile(outputPath)).readUInt32LE(24)).toBe(22050)
 })

@@ -155,3 +155,20 @@ describe('FunASR Nano utility entry', () => {
     expect(logs.filter((line) => line.includes('chunk decoded empty'))).toHaveLength(2)
   })
 })
+
+it('preserves German dictation beyond the Whisper audio window without loading FunASR weights', async () => {
+  const { asr } = await loadInferenceEntries({
+    appPath,
+    artifactPaths: {},
+    runtimeProfile: CPU_LOCAL_INFERENCE_PROFILE
+  })
+  const result = await asr.transcribe({
+    engine: 'sherpa',
+    modelPaths: { encoder: 'encoder', decoder: 'decoder', tokens: 'tokens', voiceActivityDetector: 'vad' },
+    source: { kind: 'samples', samples: new Float32Array(72 * 16000), sampleRate: 16000 }
+  })
+  expect(result.segments[0].start).toBe(0)
+  expect(result.segments.at(-1)?.end).toBe(72)
+  expect(result.segments.every((segment) => segment.end - segment.start <= 30)).toBe(true)
+  expect(result.text.replaceAll('\n', '')).toBe('T'.repeat(72))
+})

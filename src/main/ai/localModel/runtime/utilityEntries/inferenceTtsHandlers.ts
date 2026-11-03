@@ -9,12 +9,12 @@ import type {
   UtilityProcessStreamHandlers
 } from '@main/core/utilityProcess/runtime/serveUtilityProcess'
 
-import { KokoroTts } from './KokoroTts'
+import { SherpaTts } from './SherpaTts'
 
 let appPath: string
 let runtime: typeof MlxTtsRuntime | undefined
 let cached: { modelDir: string; model: TtsModel } | undefined
-let kokoro: KokoroTts | undefined
+let sherpa: SherpaTts | undefined
 
 export function initializeTts(data: TtsInitData): void {
   appPath = data.appPath
@@ -25,7 +25,7 @@ export function initializeTts(data: TtsInitData): void {
 export async function disposeTts(): Promise<void> {
   const previous = cached
   cached = undefined
-  kokoro = undefined
+  sherpa = undefined
   await previous?.model.dispose()
 }
 
@@ -46,15 +46,15 @@ async function loadModel(modelDir: string): Promise<TtsModel> {
 
 export const ttsHandlers: UtilityProcessHandlers<TtsInferenceContract> = {
   async synthesize(input, { signal }) {
-    if (input.architecture === 'kokoro') {
+    if (input.architecture !== 'qwen3-tts') {
       try {
-        kokoro ??= new KokoroTts(appPath)
+        sherpa ??= new SherpaTts(appPath)
       } catch (cause) {
         throw Object.assign(new Error('Speech model initialization failed', { cause }), {
           code: 'TTS_MODEL_LOAD_FAILED'
         })
       }
-      await kokoro.synthesize(input, signal)
+      await sherpa.synthesize(input, signal)
       return
     }
     const model = await loadModel(input.modelDir)

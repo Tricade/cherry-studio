@@ -1,0 +1,18 @@
+{
+  "repo": "csukuangfj/vits-coqui-de-css10",
+  "revision": "b07fb401ae71e8ba50a48f7c22e4a59fa028b854",
+  "files": [
+    {
+      "key": "model",
+      "relPath": "model.onnx",
+      "sha256": "e0f2cdd61176558b3da3dcca894809e630485aec3daafcee1768e47f0f5a36c4",
+      "sizeBytes": 71024119
+    },
+    {
+      "key": "tokens",
+      "relPath": "tokens.txt",
+      "sha256": "4b4ba3385bf661b87735835de24365e25623d250be0621bc184dff050df4c2fb",
+      "sizeBytes": 1410
+    }
+  ]
+}

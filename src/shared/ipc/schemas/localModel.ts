@@ -33,7 +33,14 @@ export const localModelRequestSchemas = {
   'local_model.list': defineRoute({
     input: z.void(),
     output: z.object({
-      models: z.array(z.object({ id: z.enum(LOCAL_MODEL_BUNDLE_IDS), capability: z.enum(LOCAL_MODEL_CAPABILITIES) }))
+      models: z.array(
+        z.object({
+          id: z.enum(LOCAL_MODEL_BUNDLE_IDS),
+          capability: z.enum(LOCAL_MODEL_CAPABILITIES),
+          modelBytes: z.number().int().positive().optional(),
+          license: z.object({ spdx: z.string(), url: z.url({ protocol: /^https$/ }) }).optional()
+        })
+      )
     })
   }),
   // `errorCode` is present exactly when `status` is 'error' and says why (failed

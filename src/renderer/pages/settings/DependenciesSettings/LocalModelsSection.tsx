@@ -10,7 +10,8 @@ import { useLocalModel } from '@renderer/hooks/useLocalModel'
 import { ipcApi } from '@renderer/ipc'
 import { popup } from '@renderer/services/popup'
 import { cn } from '@renderer/utils/style'
-import type { LocalModelBundleId, LocalModelCapability, LocalModelStatus } from '@shared/data/presets/localModel'
+import type { LocalModelBundleId, LocalModelStatus } from '@shared/data/presets/localModel'
+import type { OutputFor } from '@shared/ipc/types'
 
 const logger = loggerService.withContext('LocalModelsSection')
 
@@ -25,6 +26,16 @@ type CardNotice = keyof typeof CARD_NOTICE_KEYS
 
 /** Display metadata belongs to the installed model, not its capability. */
 const MODEL_CARDS = {
+  'whisper-small-de-int8': {
+    icon: <Mic className="size-5" />,
+    nameKey: 'settings.voice.model.whisper_de',
+    sources: ['csukuangfj/sherpa-onnx-whisper-small']
+  },
+  'vits-css10-de': {
+    icon: <Volume2 className="size-5" />,
+    nameKey: 'settings.voice.model.css10_de',
+    sources: ['neongeckocom/tts-vits-css10-de', 'csukuangfj/vits-coqui-de-css10']
+  },
   'qwen3-asr-1.7b-8bit': {
     icon: <Mic className="size-5" />,
     nameKey: 'settings.voice.model.qwen3_asr',
@@ -106,15 +117,15 @@ function useLocalModelCard(id: LocalModelBundleId) {
   }
 }
 
-interface ModelCardProps {
-  id: LocalModelBundleId
-  capability: LocalModelCapability
+type ListedModel = OutputFor<'local_model.list'>['models'][number]
+
+interface ModelCardProps extends ListedModel {
   /** Lifted so the section can hide every card at once when the platform is unsupported. */
   onStatusChange: (id: LocalModelBundleId, status: LocalModelStatus) => void
 }
 
-const ModelCard: FC<ModelCardProps> = ({ id, capability, onStatusChange }) => {
-  const { t } = useTranslation()
+const ModelCard: FC<ModelCardProps> = ({ id, capability, modelBytes, license, onStatusChange }) => {
+  const { t, i18n } = useTranslation()
   const { status, percent, notice, download, cancel, remove } = useLocalModelCard(id)
   const { icon, nameKey, sources } = MODEL_CARDS[id]
 
@@ -150,6 +161,24 @@ const ModelCard: FC<ModelCardProps> = ({ id, capability, onStatusChange }) => {
             )}
           </div>
           <div className="mt-0.5 flex flex-col text-xs leading-5">
+            {(modelBytes || license) && (
+              <div className="flex flex-wrap gap-x-2 text-muted-foreground">
+                {modelBytes && (
+                  <span>
+                    {new Intl.NumberFormat(i18n.language, {
+                      style: 'unit',
+                      unit: 'megabyte',
+                      maximumFractionDigits: 0
+                    }).format(modelBytes / 1_000_000)}
+                  </span>
+                )}
+                {license && (
+                  <a className="text-link hover:underline" href={license.url} target="_blank" rel="noreferrer">
+                    {license.spdx}
+                  </a>
+                )}
+              </div>
+            )}
             {sources.map((source) => (
               <a
                 key={source}
@@ -225,8 +254,6 @@ const ModelCard: FC<ModelCardProps> = ({ id, capability, onStatusChange }) => {
   )
 }
 
-type ListedModel = { id: LocalModelBundleId; capability: LocalModelCapability }
-
 /**
  * Local model download cards, one per installable bundle as reported by the registry.
  * Each is wired to its own download backend over IpcApi.
@@ -296,7 +323,7 @@ const LocalModelsSection: FC = () => {
       ) : (
         <div role="list" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {models.map((model) => (
-            <ModelCard key={model.id} id={model.id} capability={model.capability} onStatusChange={handleStatusChange} />
+            <ModelCard key={model.id} {...model} onStatusChange={handleStatusChange} />
           ))}
         </div>
       )}

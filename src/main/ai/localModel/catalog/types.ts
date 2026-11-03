@@ -97,7 +97,7 @@ interface BundleFileBase {
 
 export type BundleFile = BundleFileBase &
   (
-    | { repo: string; remoteFile: string; sources?: never; urls?: never }
+    | { repo: string; remoteFile: string; sizeBytes?: number; sources?: never; urls?: never }
     | { urls: DownloadUrls; sizeBytes: number; repo?: never; remoteFile?: never; sources?: never }
     | {
         urls?: never
@@ -133,7 +133,7 @@ export interface ModelBundle {
   requires: SharedArtifactId[]
   /** Metadata inference needs but acquisition does not. `dtype` is the transformers.js
    * quantization selector, which must match the weights file the bundle actually installs. */
-  runtime?: { dtype?: string; architecture?: 'funasr-nano' | 'qwen3-asr' | 'qwen3-tts' | 'kokoro' }
+  runtime?: { dtype?: string; architecture?: 'funasr-nano' | 'qwen3-asr' | 'qwen3-tts' | 'kokoro' | 'whisper' | 'vits' }
   provenance?: CatalogProvenance
 }
 

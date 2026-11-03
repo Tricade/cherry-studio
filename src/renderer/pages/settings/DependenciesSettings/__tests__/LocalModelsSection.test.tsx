@@ -29,7 +29,7 @@ function publishLocalModelStatus(id: LocalModelBundleId, snapshot: LocalModelSta
 }
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key })
+  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en-US' } })
 }))
 
 vi.mock('@cherrystudio/ui', () => ({
@@ -92,6 +92,26 @@ describe('LocalModelsSection', () => {
     vi.clearAllMocks()
     MockCacheUtils.resetMocks()
     MockUsePreferenceUtils.resetMocks()
+  })
+
+  it('shows the publisher license and file size before offering the German voice download', async () => {
+    const id = 'vits-css10-de'
+    const license = { spdx: 'BSD-3-Clause', url: 'https://huggingface.co/neongeckocom/tts-vits-css10-de' }
+    mockRequest.mockImplementation(async (route: string) =>
+      route === 'local_model.list'
+        ? { models: [{ id, capability: 'tts', modelBytes: 71_025_529, license }] }
+        : { supported: false }
+    )
+    publishLocalModelStatus(id, { status: 'not_downloaded', percent: 0 })
+    render(<LocalModelsSection />)
+    const card = await screen.findByRole('listitem')
+    expect(within(card).getByRole('link', { name: license.spdx })).toHaveAttribute('href', license.url)
+    expect(within(card).getByText('71 MB')).toBeInTheDocument()
+    expect(mockRequest.mock.calls.filter(([route]) => route === 'local_model.download')).toHaveLength(0)
+    await userEvent
+      .setup()
+      .click(within(card).getByRole('button', { name: 'settings.dependencies.localModels.download' }))
+    expect(mockRequest).toHaveBeenCalledWith('local_model.download', { id })
   })
 
   it('links model sources without mixing system speech resources into local models', async () => {

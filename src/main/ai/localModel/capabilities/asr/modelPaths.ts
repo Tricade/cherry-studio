@@ -13,8 +13,19 @@ export function resolveAsrModelPaths(modelId: LocalModelBundleId): AsrModelConfi
   const artifactsReady = bundle.requires.every((id) => localModelStorageService.isArtifactReady(id))
   if (!dir || !artifactsReady) throw new Error('the local speech recognition model is not fully downloaded')
   if (bundle.runtime?.architecture === 'qwen3-asr') return { engine: AsrEngine.Mlx, modelDir: dir }
-  if (bundle.runtime?.architecture !== 'funasr-nano') throw new Error('Unsupported ASR model configuration')
   const filePath = (key: string) => path.join(dir, bundleFile(bundle, key).relPath)
+  if (bundle.runtime?.architecture === 'whisper') {
+    return {
+      engine: AsrEngine.Sherpa,
+      modelPaths: {
+        encoder: filePath('encoder'),
+        decoder: filePath('decoder'),
+        tokens: filePath('tokens'),
+        voiceActivityDetector: filePath('voiceActivityDetector')
+      }
+    }
+  }
+  if (bundle.runtime?.architecture !== 'funasr-nano') throw new Error('Unsupported ASR model configuration')
   return {
     engine: AsrEngine.Sherpa,
     modelPaths: {

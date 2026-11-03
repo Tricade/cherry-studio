@@ -1,6 +1,8 @@
 import * as z from 'zod'
 
 import {
+  WHISPER_ASR_MODEL_ID,
+  CSS10_TTS_MODEL_ID,
   APPLE_ASR_MODEL_ID,
   APPLE_TTS_MODEL_ID,
   QWEN3_TTS_MODEL_ID,
@@ -62,10 +64,23 @@ const sourceEntityId = z
 const sessionAdmission = request.extend({ sourceEntityId: sourceEntityId.optional() })
 const abort = session.extend({ requestId: z.uuid() })
 const modelId = z.enum(LOCAL_VOICE_MODEL_IDS)
-const asrModelId = z.enum([APPLE_ASR_MODEL_ID, WINDOWS_ASR_MODEL_ID, FUNASR_MODEL_ID, QWEN3_ASR_MODEL_ID])
+const asrModelId = z.enum([
+  APPLE_ASR_MODEL_ID,
+  WINDOWS_ASR_MODEL_ID,
+  FUNASR_MODEL_ID,
+  QWEN3_ASR_MODEL_ID,
+  WHISPER_ASR_MODEL_ID
+])
+const speechModelId = z.enum([
+  APPLE_TTS_MODEL_ID,
+  WINDOWS_TTS_MODEL_ID,
+  QWEN3_TTS_MODEL_ID,
+  KOKORO_TTS_MODEL_ID,
+  CSS10_TTS_MODEL_ID
+])
 const speechInput = sessionAdmission
   .extend({
-    modelId: z.enum([APPLE_TTS_MODEL_ID, WINDOWS_TTS_MODEL_ID, QWEN3_TTS_MODEL_ID, KOKORO_TTS_MODEL_ID]).optional(),
+    modelId: speechModelId.optional(),
     text: z.string().trim().min(1).max(10_000),
     preferStream: z.boolean().optional(),
     textStream: z.literal(true).optional(),
@@ -168,7 +183,6 @@ const voiceStatus = z.strictObject({
     .enum(Object.keys(voiceErrorCodes) as [keyof typeof voiceErrorCodes, ...Array<keyof typeof voiceErrorCodes>])
     .optional()
 })
-const speechModelId = z.enum([APPLE_TTS_MODEL_ID, WINDOWS_TTS_MODEL_ID, QWEN3_TTS_MODEL_ID, KOKORO_TTS_MODEL_ID])
 
 export const voiceRequestSchemas = {
   'ai.voice.resources.open_settings': defineRoute({ input: z.void(), output: z.void() }),

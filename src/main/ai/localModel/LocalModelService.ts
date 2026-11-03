@@ -50,8 +50,14 @@ export class LocalModelService extends BaseService {
     await Promise.all(ALL_MODEL_BUNDLE_IDS.map((id) => this.installerFor(id).settle()))
   }
 
-  listModels(): Array<{ id: LocalModelBundleId; capability: LocalModelCapability }> {
-    return ALL_MODEL_BUNDLE_IDS.map((id) => ({ id, capability: getModelBundle(id).capability }))
+  listModels() {
+    return ALL_MODEL_BUNDLE_IDS.map((id) => {
+      const { capability, files, provenance } = getModelBundle(id)
+      const modelBytes = files.every((file) => file.sizeBytes !== undefined)
+        ? files.reduce((total, file) => total + (file.sizeBytes ?? 0), 0)
+        : undefined
+      return { id, capability, modelBytes, license: provenance?.license }
+    })
   }
 
   refreshStatus(id: LocalModelBundleId): ReturnType<BundleInstaller['getStatusInfo']> {

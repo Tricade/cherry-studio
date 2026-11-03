@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   APPLE_ASR_MODEL_ID,
   APPLE_TTS_MODEL_ID,
+  CSS10_TTS_MODEL_ID,
+  WHISPER_ASR_MODEL_ID,
   FUNASR_MODEL_ID,
   KOKORO_TTS_MODEL_ID,
   WINDOWS_ASR_MODEL_ID,
@@ -50,7 +52,9 @@ describe('device-scoped voice catalog and request policy', () => {
     [{ platform: 'darwin', arch: 'arm64', majorVersion: 12 }, [FUNASR_MODEL_ID, KOKORO_TTS_MODEL_ID]]
   ])('offers only runnable models on %j', (environment, expected) => {
     const catalog = listVoiceModels(environment)
-    expect(catalog.models.map((model) => model.id).sort()).toEqual([...expected].sort())
+    expect(catalog.models.map((model) => model.id).sort()).toEqual(
+      [...expected, WHISPER_ASR_MODEL_ID, CSS10_TTS_MODEL_ID].sort()
+    )
     if (catalog.defaultAsrModelId) expect(expected).toContain(catalog.defaultAsrModelId)
     if (catalog.defaultSpeechModelId) expect(expected).toContain(catalog.defaultSpeechModelId)
   })

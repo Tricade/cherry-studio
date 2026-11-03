@@ -153,9 +153,11 @@ export function buildPathRegistry() {
 
     // ASR model files, downloaded on demand.
     'feature.asr.qwen3': path.join(appUserDataRuntime, 'models', 'qwen3-asr-1.7b-8bit'),
+    'feature.asr.whisper': path.join(appUserDataRuntime, 'models', 'whisper-small-de-int8'),
     'feature.asr.funasr': path.join(appUserDataRuntime, 'models', 'funasr-nano'),
     'feature.mlx.binary': path.join(appUserDataToolchain, 'mlx-node'),
     'feature.tts.qwen3': path.join(appUserDataRuntime, 'models', 'qwen3-tts-0.6b-customvoice-8bit'),
+    'feature.tts.css10': path.join(appUserDataRuntime, 'models', 'vits-css10-de'),
     'feature.tts.kokoro': path.join(appUserDataRuntime, 'models', 'kokoro-multi-lang-v1.1'),
 
     // BabelDOC runtime cache (layout model, fonts, CMap/tiktoken assets)
