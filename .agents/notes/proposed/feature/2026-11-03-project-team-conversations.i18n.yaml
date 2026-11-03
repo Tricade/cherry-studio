@@ -1,0 +1,5 @@
+# Bilingual-pair consistency record (docs/dev/i18n/README.md).
+# After editing either side, update its counterpart and re-record with:
+#   pnpm docs:check-pairing --write .agents/notes/proposed/feature/2026-11-03-project-team-conversations.md
+2026-11-03-project-team-conversations.md: 1e240b20fe493d90e63f1ce3496a8eafc9fa5b08
+2026-11-03-project-team-conversations.zh.md: 98c4d548eece9e0d96fd86abcb43afda365d00bc
