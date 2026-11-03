@@ -278,46 +278,44 @@ durable request reaches `accepted`; it never waits for scheduling or target exec
 `session_create` reuses the same completion-request path. Omitting `target_agent_id` creates a
 same-Agent Session; providing it creates a Session owned by the selected Agent. The sender remains
 the trusted calling Agent/Session. A same-Agent Session continues the sender's workspace; a
-cross-Agent Session continues the target Agent's most recent workspace, falling back to the
+cross-Agent personal Session continues the target Agent's most recent personal workspace, falling back to the
 sender's workspace when that Agent has no Session. The model is not a tool argument because
 Sessions use their owning Agent's model.
 
-For project callers, `session_create` instead retains the sender's `projectId` and project workspace, and the target must be a current member of that project. The membership and session creation checks happen in the same database transaction. This restriction does not change the existing explicit `session_send` permission contract.
+In a project, start the Session of the Agent whose configured model should coordinate the team.
+Use `agent_list` to discover current members and models, `session_create` to assign work, or
+`session_send` with `reply: 'completion'` to continue an existing teammate's conversation.
+In an interactive turn, the coordinator can call `session_deliveries` with its own `request_id` and `wait_for_result: true` to wait up to 20 seconds for a committed result. A timeout returns the current state. The automatic completion still appears in the caller’s history. The coordinator can inspect the returned evidence with `session_read` and request a correction
+in an interactive turn. Project Sessions keep the project workspace. A personal Session may
+continue another Agent's most recent personal workspace.
 
-### Deliberate security ceiling
+### Conversation access and approvals
 
-`session_send` and `session_create` follow the calling Session's permission mode: interactive calls
-are auto-approved in `auto` and `bypassPermissions`, including the first send; other modes require
-per-call approval. Existing Agents in either automatic mode adopt this behavior without migration.
-Claude SDK approval requests, including explicit `permissions.ask` rules, still require a user
-decision in automatic modes; ordinary delegation is approved by `PreToolUse` before that callback.
-A headless delivery, channel turn, scheduled turn, or execution without an approval responder is
-denied in every mode before either tool runs. Runtime-generated completion
-results do not call a model tool and route only to the immutable sender Session stored on the
-accepted request.
+The active Session supplies the project identity. Discovery, metadata and message search, exact
+reads, tool output, rename and delivery use current project membership and workspace. The query
+applies the boundary before pagination, ranking or extracting snippets. Knowing a Session ID or
+sharing an Agent or workspace across projects does not grant access. Within projects only team
+Agent Sessions are addressable. Personal callers can also read ordinary topics and temporary chats.
+The application's own history and recovery views keep their existing access.
 
-This deliberately limits delegation to one hop from an interactive Session. A Session started
-by a delivery cannot initiate another `session_send` or `session_create`; it can only finish its own
-request and let the runtime return the result. The limit prevents unattended A -> B -> A loops and a
-prompt-injected Agent from using a more privileged Agent as a confused deputy without introducing a
-speculative ACL subsystem. Upgrade only when the product requires unattended multi-hop
-collaboration; that upgrade must add an explicit Agent allowlist/delegation policy plus trusted trace
-ancestry, depth/cycle checks, and a total-call/rate budget before relaxing the headless denial.
+`session_read`, `session_search`, `session_rename`, `session_create` and `session_send` follow
+the calling Agent's permission mode. Interactive calls in `default`, `acceptEdits` and `plan` ask
+for approval. In `auto` and `bypassPermissions` they run automatically. An explicit Claude SDK
+ask rule still requires a response. Listing teammates and conversation titles exposes only
+addressable metadata.
 
-List, search, rename, send, create, and delivery-query visibility share one authorization boundary. Channel,
-scheduled, and delivery-triggered turns are denied in code; Task sub-agents may discover Sessions
-and delegate under the calling Session's permission mode and interaction boundary. Knowing a Session or message id never grants
-access by itself. `session_list` pages only addressable Sessions and returns an opaque cursor.
+During a project delivery, the receiving Agent in an automatic mode can list teammates and
+Sessions and read or search team evidence. Main verifies the live persisted request, its exact
+assistant turn, both current memberships and the receiving Agent's permission mode. A channel,
+scheduled or personal delivery has no such grant. A mode requiring user approval cannot read
+another chat without a responder. Delivery-triggered turns cannot create, send or rename a
+Session in any mode. Project membership alone never starts a turn.
 
-`session_rename` is auto-approved within this interactive boundary. It changes only
-Session name metadata and does not create a delivery or start a target turn.
-
-`session_read` shares this caller authorization boundary. It reads current source data, without a
-cutoff or snapshot. Topic queries retain branch and sibling options; Agent Session queries
-retain their existing pagination. Temporary conversations retain their in-memory lifetime and list
-semantics. Exact message reads check conversation membership. A `tool_call_id` with `message_id`
-uses the same persisted tool-output reconstruction as the renderer, including its explicit fallback
-when an offloaded blob is missing. Reading history does not grant filesystem attachment access.
+The runtime checks the participants again before dispatching accepted work and before returning
+a frozen completion or failure. Removing a member stops further transfers. Previously delivered
+material remains in the recipient's history. `session_read` retains pagination, exact-message
+membership checks and persisted tool-output reconstruction. Attachments and filesystem access
+remain separate from conversation evidence.
 
 ### Durable row shape
 

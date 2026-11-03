@@ -95,6 +95,8 @@ describe('Agent prompt onboarding', () => {
     })
     expect(append).toContain('2. Agent System Prompt')
     expect(append).toContain('3. Project instructions\n4. Workspace Instructions')
+    expect(append).toContain('session_create or session_send')
+    expect(append).toContain('session_read for supporting evidence')
     expect(append).toContain('<project_instructions>\nUse the team style guide.\n</project_instructions>')
     expect(agentService.getAgent(id)?.instructions).toBe('Review code.')
   })

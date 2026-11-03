@@ -116,7 +116,7 @@ export function buildClaudeCodeHooks(ctx: ClaudeCodeHookContext): ClaudeCodeSett
       if (
         snapshot &&
         findBuiltinToolPolicy(toolName, ctx.mountedServers)?.approval === 'delegation' &&
-        resolveDelegationApproval(snapshot.getPermissionMode(), interaction) === 'allow'
+        resolveDelegationApproval(snapshot.getPermissionMode(), interaction, toolName) === 'allow'
       ) {
         return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'allow' } }
       }

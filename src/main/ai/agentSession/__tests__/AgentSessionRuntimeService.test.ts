@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => ({
   resolveCrashOrphanedMessages: vi.fn(),
   updateSessionDeliveryStatus: vi.fn(),
   transitionSessionDelivery: vi.fn(),
+  allowsProjectDeliveryRead: vi.fn(),
   finalizeSessionDelivery: vi.fn(),
   failSessionDelivery: vi.fn(),
   maybeRenameAgentSession: vi.fn(),
@@ -117,6 +118,7 @@ vi.mock('@data/services/AgentSessionMessageService', () => ({
     resolveCrashOrphanedMessages: mocks.resolveCrashOrphanedMessages,
     updateSessionDeliveryStatus: mocks.updateSessionDeliveryStatus,
     transitionSessionDelivery: mocks.transitionSessionDelivery,
+    allowsProjectDeliveryRead: mocks.allowsProjectDeliveryRead,
     finalizeSessionDelivery: mocks.finalizeSessionDelivery,
     failSessionDelivery: mocks.failSessionDelivery
   }
@@ -1404,6 +1406,37 @@ describe('AgentSessionRuntimeService', () => {
 
       expect(getEntry(service).currentTurn.headless).toBe(false)
       expect(service.getInteractionState('session-1').currentTurn).toBe('interactive')
+    })
+
+    it('checks the exact live headless delivery before allowing project evidence and observes revocation', () => {
+      const service = new AgentSessionRuntimeService()
+      const message = userMessage('accepted-request')
+      message.delivery = {
+        version: 1,
+        sender: { agentId: 'lead', sessionId: 'lead-chat' },
+        receiver: { agentId: 'agent-1', sessionId: 'session-1' },
+        replyPolicy: 'completion',
+        sourceMessageId: null,
+        outcome: null,
+        error: null,
+        statusAt: new Date().toISOString(),
+        status: 'accepted',
+        inReplyTo: null,
+        turnRef: null
+      }
+      service.beginTurn({ ...baseTurnInput, headless: true, userMessage: message })
+      mocks.allowsProjectDeliveryRead.mockReturnValueOnce(true).mockReturnValueOnce(false)
+      expect(service.getInteractionState('session-1')).toEqual({
+        currentTurn: 'headless',
+        userResponse: 'unavailable',
+        projectDeliveryRead: true
+      })
+      expect(mocks.allowsProjectDeliveryRead).toHaveBeenCalledWith(
+        'session-1',
+        'accepted-request',
+        baseTurnInput.assistantMessageId
+      )
+      expect(service.getInteractionState('session-1')).toEqual({ currentTurn: 'headless', userResponse: 'unavailable' })
     })
 
     it('sets current turn headless from beginTurn input', () => {

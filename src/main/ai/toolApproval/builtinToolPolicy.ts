@@ -1,3 +1,4 @@
+import { SESSION_READ_TOOL_NAME, SESSION_SEARCH_TOOL_NAME } from '@shared/ai/agentSessionDelivery'
 import type { AgentPermissionMode } from '@shared/data/api/schemas/agents'
 
 import {
@@ -19,10 +20,17 @@ export { CHERRY_MCP_SERVER } from './builtinToolPolicyRegistry'
 /** Auto-approval never authorizes another unattended delegation hop. */
 export function resolveDelegationApproval(
   mode: AgentPermissionMode | undefined,
-  interaction: ToolGuardInteractionState
+  interaction: ToolGuardInteractionState,
+  toolName: string
 ): 'allow' | 'ask' | 'deny' {
-  if (interaction.currentTurn === 'headless' || interaction.userResponse === 'unavailable') return 'deny'
-  return mode === 'auto' || mode === 'bypassPermissions' ? 'allow' : 'ask'
+  const automatic = mode === 'auto' || mode === 'bypassPermissions'
+  if (interaction.currentTurn === 'headless' || interaction.userResponse === 'unavailable') {
+    const evidenceTool =
+      toolName === toCherryBuiltinRuntimeName(SESSION_READ_TOOL_NAME) ||
+      toolName === toCherryBuiltinRuntimeName(SESSION_SEARCH_TOOL_NAME)
+    return automatic && interaction.projectDeliveryRead && evidenceTool ? 'allow' : 'deny'
+  }
+  return automatic ? 'allow' : 'ask'
 }
 
 const BUILTIN_TOOL_POLICY_BY_RUNTIME_NAME = new Map(

@@ -201,6 +201,7 @@ export interface AgentSessionRuntimeSnapshot {
 }
 
 export interface AgentSessionInteractionState {
+  readonly projectDeliveryRead?: true
   currentTurn: 'none' | 'interactive' | 'headless'
   userResponse: 'unavailable' | 'stream' | 'message'
 }
@@ -3327,10 +3328,16 @@ export class AgentSessionRuntimeService extends BaseService {
         userResponse: execution.headless ? 'unavailable' : 'stream'
       }
     }
+    const projectDeliveryRead =
+      turn?.headless &&
+      turn.userMessage.delivery &&
+      agentSessionMessageService.allowsProjectDeliveryRead(sessionId, turn.userMessage.id, turn.assistantMessageId)
+        ? { projectDeliveryRead: true as const }
+        : {}
     const backgroundResponder = getAgentSessionRuntimeOccupancy(entry.runtimeState)?.background?.responder
     if (backgroundResponder) {
       if (backgroundResponder === 'headless') {
-        return { currentTurn, userResponse: 'unavailable' }
+        return { ...projectDeliveryRead, currentTurn, userResponse: 'unavailable' }
       }
       // A background wake is deliberately an independent interaction. It must not attach approval
       // UI to a prior turn's stream merely because the receive-only projection is still opening.
@@ -3339,7 +3346,7 @@ export class AgentSessionRuntimeService extends BaseService {
         hasAgentSessionRuntimeOpenStream(entry.runtimeState, turn) && turn !== undefined && this.isTurnLive(entry, turn)
       return { currentTurn, userResponse: hasStream ? 'stream' : 'message' }
     }
-    if (currentTurn !== 'interactive') return { currentTurn, userResponse: 'unavailable' }
+    if (currentTurn !== 'interactive') return { ...projectDeliveryRead, currentTurn, userResponse: 'unavailable' }
     const hasStream =
       hasAgentSessionRuntimeOpenStream(entry.runtimeState, turn) && turn !== undefined && this.isTurnLive(entry, turn)
     return { currentTurn, userResponse: hasStream ? 'stream' : 'message' }

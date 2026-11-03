@@ -147,7 +147,7 @@ export function createPiToolAuthorizer(ctx: PiApprovalContext): PiToolAuthorizer
 
     const mode = ctx.getPermissionMode() ?? 'default'
     const delegationApproval = ctx.delegationTools.has(toolName)
-      ? resolveDelegationApproval(mode, ctx.getInteractionState())
+      ? resolveDelegationApproval(mode, ctx.getInteractionState(), toolName)
       : undefined
     if (delegationApproval === 'deny') {
       return { block: true, reason: 'Cross-Session delegation requires an interactive user turn.' }

@@ -7,6 +7,7 @@ import { McpServer } from '@modelcontextprotocol/server'
 import { connectMcpTestClient } from '@test-helpers/mcp/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type * as SessionTeamScopeModule from '@data/services/utils/sessionTeamScope'
 import type * as ChannelsModule from '@main/ai/channels'
 import type { AgentSessionWorkspaceSource } from '@shared/data/api/schemas/agentWorkspaces'
 
@@ -32,6 +33,7 @@ const mockReconnectChannel = vi.fn()
 const mockReconnectChannelWithQr = vi.fn()
 const mockGetSession = vi.fn()
 const mockGetLatestActive = vi.fn()
+const mockAddressable = vi.fn()
 const mockReadConversation = vi.fn()
 const mockFindPersistedToolOutput = vi.fn()
 const mockListSessions = vi.fn()
@@ -58,6 +60,10 @@ vi.mock('@data/services/AgentService', () => ({
   }
 }))
 
+vi.mock('@data/services/utils/sessionTeamScope', async (original) => ({
+  ...(await original<typeof SessionTeamScopeModule>()),
+  isAddressableSessionInTeam: mockAddressable
+}))
 vi.mock('@main/ai/messages/readConversation', () => ({
   readConversation: mockReadConversation
 }))
@@ -192,6 +198,7 @@ describe('cherry-tools autonomy tools', () => {
     vi.clearAllMocks()
     mockGetChannel.mockImplementation((channelId: string) => ({ id: channelId, agentId: 'agent_1' }))
     mockGetSession.mockReturnValue({ id: 'session_test', agentId: 'agent_test' })
+    mockAddressable.mockReturnValue(true)
     mockGetLatestActive.mockReturnValue(null)
     mockGetAgent.mockReturnValue({ id: 'agent_test', name: 'Agent A', model: 'provider::model' })
     mockListAgents.mockReturnValue({ agents: [], total: 0 })
@@ -304,14 +311,17 @@ describe('cherry-tools autonomy tools', () => {
 
       const result = await callTool(createServer(), { session_id: 'topic-1', limit: 10 }, 'session_read')
 
-      expect(mockReadConversation).toHaveBeenCalledWith({
-        sessionId: 'topic-1',
-        cursor: undefined,
-        limit: 10,
-        nodeId: undefined,
-        includeSiblings: undefined,
-        messageId: undefined
-      })
+      expect(mockReadConversation).toHaveBeenCalledWith(
+        {
+          sessionId: 'topic-1',
+          cursor: undefined,
+          limit: 10,
+          nodeId: undefined,
+          includeSiblings: undefined,
+          messageId: undefined
+        },
+        null
+      )
       expect(JSON.parse(result.content[0].text)).toMatchObject({
         source: 'topic',
         messages: [{ message: { id: 'message-1' } }],
@@ -407,6 +417,30 @@ describe('cherry-tools autonomy tools', () => {
       }
     )
 
+    it('withholds offloaded evidence if team access changes while it is loading', async () => {
+      mockGetSession.mockReturnValue({ id: 'session_test', agentId: 'agent_test', projectId: 'project-1' })
+      mockReadConversation.mockReturnValue({
+        source: 'agent',
+        sessionId: 'worker',
+        message: {
+          id: 'msg',
+          role: 'assistant',
+          data: { parts: [] }
+        }
+      })
+      mockFindPersistedToolOutput.mockImplementationOnce(async () => {
+        mockAddressable.mockReturnValue(false)
+        return { found: true, content: 'revoked evidence' }
+      })
+      const result = await callTool(
+        createServer(),
+        { session_id: 'worker', message_id: 'msg', tool_call_id: 'call' },
+        'session_read'
+      )
+      expect(result.isError).toBe(true)
+      expect(result.content[0].text).not.toContain('revoked evidence')
+    })
+
     it('adds a persisted tool result to an exact session_read', async () => {
       mockReadConversation.mockReturnValue({
         source: 'agent',
@@ -495,7 +529,12 @@ describe('cherry-tools autonomy tools', () => {
 
       const result = await callTool(createServer(), { cursor: 'session-prev', limit: 5 }, 'session_list')
 
-      expect(mockListSessions).toHaveBeenCalledWith({ agentId: undefined, cursor: 'session-prev', limit: 5 })
+      expect(mockListSessions).toHaveBeenCalledWith({
+        agentId: undefined,
+        cursor: 'session-prev',
+        limit: 5,
+        teamScope: null
+      })
       expect(JSON.parse(result.content[0].text)).toEqual({ sessions: [], nextCursor: 'session-next' })
     })
 
@@ -565,7 +604,8 @@ describe('cherry-tools autonomy tools', () => {
         q: 'auth',
         limit: 20,
         agentId: undefined,
-        addressableOnly: true
+        addressableOnly: true,
+        teamScope: null
       })
     })
 
@@ -576,13 +616,15 @@ describe('cherry-tools autonomy tools', () => {
         q: 'auth',
         limit: 3,
         agentId: 'agent_b',
-        addressableOnly: true
+        addressableOnly: true,
+        teamScope: null
       })
       expect(mockSearchSessions).toHaveBeenCalledWith({
         q: 'auth',
         limit: 3,
         agentId: 'agent_b',
-        addressableOnly: true
+        addressableOnly: true,
+        teamScope: null
       })
     })
 
@@ -737,7 +779,7 @@ describe('cherry-tools autonomy tools', () => {
 
       await callTool(createServer(), { message: 'Delegate this', target_agent_id: 'agent-target' }, 'session_create')
 
-      expect(mockGetLatestActive).toHaveBeenCalledWith({ agentId: 'agent-target' })
+      expect(mockGetLatestActive).toHaveBeenCalledWith({ agentId: 'agent-target' }, null)
       expect(mockCreateSessionWithDelivery).toHaveBeenCalledWith({
         senderAgentId: 'agent_test',
         senderSessionId: 'session_test',
