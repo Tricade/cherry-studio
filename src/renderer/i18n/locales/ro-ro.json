@@ -3197,7 +3197,7 @@
   "privacy_policy_update.policy": "Politica de confidențialitate",
   "privacy_policy_update.title": "Politica de confidențialitate actualizată",
   "project.agents": "Membrii echipei",
-  "project.agents_hint": "Selectează agenți existenți. Fiecare își păstrează rolul și modelul configurate. Începe o conversație separată cu orice membru; crearea unei echipe nu pornește automat un flux de lucru.",
+  "project.agents_hint": "Alege agenți existenți cu rolurile și modelele lor. Deschide conversația cu agentul care va coordona echipa. Acesta poate atribui sarcini, verifica răspunsuri și solicita modificări. Modul de permisiuni al fiecărui agent îi controlează accesul la conversațiile echipei.",
   "project.choose_workspace": "Alege sau adaugă un folder",
   "project.delete": "Șterge proiectul",
   "project.delete_confirm": "Confirmă ștergerea proiectului",
