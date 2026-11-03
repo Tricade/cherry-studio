@@ -3197,7 +3197,7 @@
   "privacy_policy_update.policy": "Informativa sulla privacy",
   "privacy_policy_update.title": "Informativa sulla privacy aggiornata",
   "project.agents": "Membri del team",
-  "project.agents_hint": "Seleziona agenti esistenti. Ognuno mantiene il ruolo e il modello configurati. Avvia una conversazione separata con qualsiasi membro; la creazione di un team non avvia un flusso di lavoro automatico.",
+  "project.agents_hint": "Scegli agenti esistenti con i propri ruoli e modelli. Apri la chat con l’agente che coordinerà il team. Può assegnare attività, verificare le risposte e richiedere modifiche. La modalità di autorizzazione di ciascun agente regola il suo accesso alle chat del team.",
   "project.choose_workspace": "Scegli o aggiungi una cartella",
   "project.delete": "Elimina progetto",
   "project.delete_confirm": "Conferma l'eliminazione del progetto",
