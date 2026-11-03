@@ -3197,7 +3197,7 @@
   "privacy_policy_update.policy": "Politique de confidentialité",
   "privacy_policy_update.title": "Politique de confidentialité mise à jour",
   "project.agents": "Membres de l’équipe",
-  "project.agents_hint": "Sélectionnez des agents existants. Chacun conserve le rôle et le modèle configurés. Lancez une conversation séparée avec le membre de votre choix ; la création d’une équipe ne lance pas de workflow automatique.",
+  "project.agents_hint": "Choisissez des agents existants avec leurs propres rôles et modèles. Ouvrez la conversation avec l’agent qui dirigera l’équipe. Il peut attribuer des tâches, examiner les réponses et demander des modifications. Le mode d’autorisation de chaque agent régit son accès aux conversations de l’équipe.",
   "project.choose_workspace": "Choisir ou ajouter un dossier",
   "project.delete": "Supprimer le projet",
   "project.delete_confirm": "Confirmer la suppression du projet",

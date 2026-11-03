@@ -13,10 +13,12 @@ import * as z from 'zod'
 
 import { application } from '@application'
 import { agentChannelService as channelService } from '@data/services/AgentChannelService'
+import { agentProjectService } from '@data/services/AgentProjectService'
 import { agentService } from '@data/services/AgentService'
 import { AgentSessionDeliveryRoutingError, agentSessionMessageService } from '@data/services/AgentSessionMessageService'
 import { agentSessionService } from '@data/services/AgentSessionService'
 import { agentTaskService as taskService } from '@data/services/AgentTaskService'
+import { isAddressableSessionInTeam, type SessionTeamScope } from '@data/services/utils/sessionTeamScope'
 import { loggerService } from '@logger'
 import { buildAgentSessionTopicId } from '@main/ai/agentSession/topic'
 import {
@@ -286,6 +288,12 @@ const SessionReadInputSchema = z.strictObject({
 const SessionDeliveriesInputSchema = z.object({
   direction: z.enum(['incoming', 'outgoing']).optional(),
   request_id: z.string().optional().describe('Optional request id; correlated results are included.'),
+  wait_for_result: z
+    .boolean()
+    .optional()
+    .describe(
+      'In a project, wait up to 20 seconds for your own completion request before returning its current state.'
+    ),
   status: AgentSessionDeliveryStatusSchema.optional(),
   limit: z.number().optional().describe('Maximum deliveries to return (default 20, max 100).')
 })
@@ -315,15 +323,24 @@ const SessionSendInputSchema = z.object({
     .describe('completion returns one asynchronous terminal result in a separate turn.')
 })
 
-function assertCurrentSessionIdentity(ctx: AutonomyToolsContext): void {
+function currentSessionTeam(ctx: AutonomyToolsContext): SessionTeamScope {
   const session = agentSessionService.getById(ctx.sessionId)
   if (session.agentId !== ctx.agentId) {
     throw new AgentSessionDeliveryRoutingError('SENDER_FORBIDDEN', 'The active runtime no longer owns this Session')
   }
+  const projectId = session.projectId ?? null
+  if (
+    projectId !== null &&
+    !isAddressableSessionInTeam(application.get('DbService').getDb(), ctx.sessionId, projectId, ctx.agentId)
+  ) {
+    throw new AgentSessionDeliveryRoutingError('SENDER_FORBIDDEN', 'The active Session no longer belongs to this team')
+  }
+  return projectId
 }
 
-function assertSessionToolsAuthorized(ctx: AutonomyToolsContext): void {
+function assertSessionToolsAuthorized(ctx: AutonomyToolsContext, teamScope: SessionTeamScope, readOnly: boolean): void {
   const interaction = application.get('AgentSessionRuntimeService').getInteractionState(ctx.sessionId)
+  if (readOnly && teamScope !== null && interaction.projectDeliveryRead) return
   if (interaction.currentTurn === 'headless' || interaction.userResponse === 'unavailable') {
     throw new AgentSessionDeliveryRoutingError(
       'SESSION_TOOL_FORBIDDEN',
@@ -335,12 +352,13 @@ function assertSessionToolsAuthorized(ctx: AutonomyToolsContext): void {
 /** Session tools share the sender gates; routing failures keep a machine-readable code for the model. */
 async function runSessionTool(
   ctx: AutonomyToolsContext,
-  run: () => CallToolResult | Promise<CallToolResult>
+  run: (teamScope: SessionTeamScope) => CallToolResult | Promise<CallToolResult>,
+  access: 'team-evidence' | 'interactive' = 'interactive'
 ): Promise<CallToolResult> {
   try {
-    assertCurrentSessionIdentity(ctx)
-    assertSessionToolsAuthorized(ctx)
-    return await run()
+    const teamScope = currentSessionTeam(ctx)
+    assertSessionToolsAuthorized(ctx, teamScope, access === 'team-evidence')
+    return await run(teamScope)
   } catch (error) {
     if (!(error instanceof AgentSessionDeliveryRoutingError)) throw error
     return {
@@ -356,10 +374,19 @@ function clampLimit(limit: number | undefined, fallback: number): number {
   return limit === undefined ? fallback : Math.min(Math.max(Math.trunc(limit), 1), 100)
 }
 
-function listSessions(ctx: AutonomyToolsContext, args: z.output<typeof SessionListInputSchema>): CallToolResult {
+function listSessions(
+  ctx: AutonomyToolsContext,
+  args: z.output<typeof SessionListInputSchema>,
+  teamScope: SessionTeamScope
+): CallToolResult {
   const agentId = args.agent_id?.trim() || undefined
   const cursor = args.cursor?.trim() || undefined
-  const page = agentSessionService.listAddressableByCursor({ agentId, cursor, limit: clampLimit(args.limit, 50) })
+  const page = agentSessionService.listAddressableByCursor({
+    teamScope,
+    agentId,
+    cursor,
+    limit: clampLimit(args.limit, 50)
+  })
   const sessions = page.items.map((session) => ({
     ...session,
     isCurrent: session.sessionId === ctx.sessionId
@@ -369,8 +396,9 @@ function listSessions(ctx: AutonomyToolsContext, args: z.output<typeof SessionLi
   }
 }
 
-function listAgents(): CallToolResult {
-  const agents = agentService.listAgents().agents.map((agent) => ({
+function listAgents(teamScope: SessionTeamScope): CallToolResult {
+  const members = teamScope === null ? undefined : agentProjectService.getById(teamScope).agentIds
+  const agents = agentService.listAgents(members ? { ids: members } : undefined).agents.map((agent) => ({
     id: agent.id,
     name: agent.name,
     description: agent.description ?? '',
@@ -378,25 +406,40 @@ function listAgents(): CallToolResult {
       type: agent.type,
       available: runtimeDriverRegistry.getAgentSessionDriver(agent.type) !== undefined
     },
+    ...(members ? { model: agent.model } : {}),
     modelConfigured: agent.model !== null
   }))
   return { content: [{ type: 'text', text: JSON.stringify({ agents }) }] }
 }
 
-function renameSession(ctx: AutonomyToolsContext, args: z.output<typeof SessionRenameInputSchema>): CallToolResult {
+function renameSession(
+  ctx: AutonomyToolsContext,
+  args: z.output<typeof SessionRenameInputSchema>,
+  teamScope: SessionTeamScope
+): CallToolResult {
   const sessionId = args.session_id ?? ctx.sessionId
-  const updated = agentSessionService.update(sessionId, { name: args.title })
+  const updated = agentSessionService.update(sessionId, { name: args.title }, teamScope)
   return {
     content: [{ type: 'text', text: JSON.stringify({ sessionId: updated.id, sessionName: updated.name }) }]
   }
 }
 
-function searchSessions(ctx: AutonomyToolsContext, args: z.output<typeof SessionSearchInputSchema>): CallToolResult {
+function searchSessions(
+  ctx: AutonomyToolsContext,
+  args: z.output<typeof SessionSearchInputSchema>,
+  teamScope: SessionTeamScope
+): CallToolResult {
   const query = args.query.trim()
   if (!query) throw new Error("'query' is required")
   const agentId = args.agent_id?.trim() || undefined
   const limit = clampLimit(args.limit, 20)
-  const matches = agentSessionMessageService.searchRanked({ q: query, limit, agentId, addressableOnly: true })
+  const matches = agentSessionMessageService.searchRanked({
+    q: query,
+    limit,
+    agentId,
+    addressableOnly: true,
+    teamScope
+  })
   const sessions = new Map<
     string,
     {
@@ -426,7 +469,8 @@ function searchSessions(ctx: AutonomyToolsContext, args: z.output<typeof Session
     q: query,
     limit,
     agentId,
-    addressableOnly: true
+    addressableOnly: true,
+    teamScope
   })) {
     const match = result.item
     const existing = sessions.get(match.id)
@@ -448,7 +492,11 @@ function searchSessions(ctx: AutonomyToolsContext, args: z.output<typeof Session
   return { content: [{ type: 'text', text: JSON.stringify({ sessions: [...sessions.values()] }) }] }
 }
 
-async function readSession(args: z.output<typeof SessionReadInputSchema>): Promise<CallToolResult> {
+async function readSession(
+  ctx: AutonomyToolsContext,
+  args: z.output<typeof SessionReadInputSchema>,
+  teamScope: SessionTeamScope
+): Promise<CallToolResult> {
   const sessionId = args.session_id.trim()
   if (args.tool_call_id && !args.message_id) {
     throw new Error("'tool_call_id' requires 'message_id'")
@@ -462,10 +510,19 @@ async function readSession(args: z.output<typeof SessionReadInputSchema>): Promi
     includeSiblings: args.include_siblings,
     messageId: args.message_id
   }
-  const conversation = conversationEvidence(readConversation(readInput))
+  const conversation = conversationEvidence(readConversation(readInput, teamScope))
   if (args.tool_call_id && args.message_id) {
     const topicId = conversation.source === 'agent' ? buildAgentSessionTopicId(sessionId) : sessionId
     const toolResult = await findPersistedToolOutput(topicId, args.message_id, args.tool_call_id)
+    // Offloaded tool output can cross an async boundary while a user removes a team member.
+    assertSessionToolsAuthorized(ctx, teamScope, true)
+    if (
+      currentSessionTeam(ctx) !== teamScope ||
+      (conversation.source === 'agent' &&
+        !isAddressableSessionInTeam(application.get('DbService').getDb(), sessionId, teamScope))
+    ) {
+      throw new AgentSessionDeliveryRoutingError('TARGET_SESSION_NOT_FOUND', 'Conversation not found')
+    }
     return { content: [{ type: 'text', text: JSON.stringify({ ...conversation, toolResult }) }] }
   }
   return { content: [{ type: 'text', text: JSON.stringify(conversation) }] }
@@ -473,10 +530,12 @@ async function readSession(args: z.output<typeof SessionReadInputSchema>): Promi
 
 function listSessionDeliveries(
   ctx: AutonomyToolsContext,
-  args: z.output<typeof SessionDeliveriesInputSchema>
+  args: z.output<typeof SessionDeliveriesInputSchema>,
+  teamScope: SessionTeamScope
 ): CallToolResult {
   const deliveries = agentSessionMessageService
     .listSessionDeliveries({
+      teamScope,
       sessionId: ctx.sessionId,
       direction: args.direction ?? 'incoming',
       requestId: args.request_id?.trim(),
@@ -502,18 +561,23 @@ function listSessionDeliveries(
 
 function resolveWorkspaceForNewSession(
   ctx: AutonomyToolsContext,
-  targetAgentId: string | undefined
+  targetAgentId: string | undefined,
+  teamScope: SessionTeamScope
 ): AgentSessionWorkspaceSource {
-  if (!targetAgentId || targetAgentId === ctx.agentId) return ctx.workspaceSource
-  // Match a human opening the target Agent: continue that Agent's own last workspace.
-  const latest = agentSessionService.getLatestActive({ agentId: targetAgentId })
+  if (teamScope !== null || !targetAgentId || targetAgentId === ctx.agentId) return ctx.workspaceSource
+  // Continue only the target's last personal workspace when delegating outside a project.
+  const latest = agentSessionService.getLatestActive({ agentId: targetAgentId }, null)
   if (!latest) return ctx.workspaceSource
   return latest.workspace.type === AGENT_WORKSPACE_TYPE.USER
     ? { type: AGENT_WORKSPACE_TYPE.USER, workspaceId: latest.workspaceId }
     : { type: AGENT_WORKSPACE_TYPE.SYSTEM }
 }
 
-function createSession(ctx: AutonomyToolsContext, args: z.output<typeof SessionCreateInputSchema>): CallToolResult {
+function createSession(
+  ctx: AutonomyToolsContext,
+  args: z.output<typeof SessionCreateInputSchema>,
+  teamScope: SessionTeamScope
+): CallToolResult {
   const content = args.message.trim()
   const title = args.title?.trim() ?? ''
   if (!content) throw new Error("'message' is required")
@@ -522,6 +586,9 @@ function createSession(ctx: AutonomyToolsContext, args: z.output<typeof SessionC
   if (args.target_agent_id !== undefined) {
     targetAgentId = args.target_agent_id.trim()
     if (!targetAgentId) throw new Error("'target_agent_id' must be a non-empty string")
+    if (teamScope !== null && !agentProjectService.getById(teamScope).agentIds.includes(targetAgentId)) {
+      throw new AgentSessionDeliveryRoutingError('TARGET_AGENT_DELETED', 'Target Agent not found in this team')
+    }
     if (!agentService.getAgent(targetAgentId)) {
       throw new AgentSessionDeliveryRoutingError('TARGET_AGENT_DELETED', `Target Agent not found: ${targetAgentId}`)
     }
@@ -531,7 +598,7 @@ function createSession(ctx: AutonomyToolsContext, args: z.output<typeof SessionC
     senderAgentId: ctx.agentId,
     senderSessionId: ctx.sessionId,
     sessionName: title,
-    workspace: resolveWorkspaceForNewSession(ctx, targetAgentId),
+    workspace: resolveWorkspaceForNewSession(ctx, targetAgentId, teamScope),
     content,
     ...(targetAgentId ? { targetAgentId } : {})
   })
@@ -1170,15 +1237,16 @@ export function registerAutonomyTools(server: McpServer, ctx: AutonomyToolsConte
         'List active Cherry Agent Sessions that can receive a message. Returns both agentId and sessionId for every address.',
       inputSchema: SessionListInputSchema
     },
-    (args) => runSessionTool(ctx, () => listSessions(ctx, args))
+    (args) => runSessionTool(ctx, (teamScope) => listSessions(ctx, args, teamScope), 'team-evidence')
   )
   server.registerTool(
     AGENT_LIST_TOOL_NAME,
     {
-      description: 'List available Cherry Agents with their public identity and runtime readiness.',
+      description:
+        'List available Cherry Agents. Within a project, discover only current teammates and their configured models.',
       inputSchema: z.object({})
     },
-    () => runSessionTool(ctx, listAgents)
+    () => runSessionTool(ctx, listAgents, 'team-evidence')
   )
   server.registerTool(
     SESSION_SEARCH_TOOL_NAME,
@@ -1186,16 +1254,16 @@ export function registerAutonomyTools(server: McpServer, ctx: AutonomyToolsConte
       description: 'Search visible Cherry Agent Sessions by metadata and message evidence.',
       inputSchema: SessionSearchInputSchema
     },
-    (args) => runSessionTool(ctx, () => searchSessions(ctx, args))
+    (args) => runSessionTool(ctx, (teamScope) => searchSessions(ctx, args, teamScope), 'team-evidence')
   )
   server.registerTool(
     SESSION_READ_TOOL_NAME,
     {
       description:
-        'Read messages from a Chat topic, Agent Session, or temp chat. Use message_id for one message; attachments are omitted.',
+        'Read conversation evidence. Within a project, only current team sessions are visible. Use message_id for one message. Attachments are omitted.',
       inputSchema: SessionReadInputSchema
     },
-    (args) => runSessionTool(ctx, () => readSession(args))
+    (args) => runSessionTool(ctx, (teamScope) => readSession(ctx, args, teamScope), 'team-evidence')
   )
   server.registerTool(
     SESSION_RENAME_TOOL_NAME,
@@ -1204,16 +1272,16 @@ export function registerAutonomyTools(server: McpServer, ctx: AutonomyToolsConte
         'Rename the current Agent Session, or another Agent Session by id. The title is protected from automatic renaming.',
       inputSchema: SessionRenameInputSchema
     },
-    (args) => runSessionTool(ctx, () => renameSession(ctx, args))
+    (args) => runSessionTool(ctx, (teamScope) => renameSession(ctx, args, teamScope))
   )
   server.registerTool(
     SESSION_CREATE_TOOL_NAME,
     {
       description:
-        "Create a Session and send its first message. Omit target_agent_id for this Agent; it inherits the current workspace. With target_agent_id, the Session uses that Agent's own most recent workspace, falling back to the current workspace when the Agent has no Session.",
+        'Assign a task in a new Session and receive its completion. Set target_agent_id to choose a teammate. Project Sessions inherit the project workspace. Outside projects, another Agent continues its most recent personal workspace when available.',
       inputSchema: SessionCreateInputSchema
     },
-    (args) => runSessionTool(ctx, () => createSession(ctx, args))
+    (args) => runSessionTool(ctx, (teamScope) => createSession(ctx, args, teamScope))
   )
   server.registerTool(
     SESSION_DELIVERIES_TOOL_NAME,
@@ -1221,13 +1289,24 @@ export function registerAutonomyTools(server: McpServer, ctx: AutonomyToolsConte
       description: 'Inspect durable incoming or outgoing cross-Session requests, results, and delivery state.',
       inputSchema: SessionDeliveriesInputSchema
     },
-    (args) => runSessionTool(ctx, () => listSessionDeliveries(ctx, args))
+    (args, request) =>
+      runSessionTool(ctx, async (teamScope) => {
+        if (args.wait_for_result) {
+          const id = args.request_id?.trim()
+          if (!id || teamScope === null) throw new Error('Waiting requires a project and a request_id')
+          await agentSessionMessageService.waitForProjectDelivery(ctx.sessionId, teamScope, id, request.mcpReq.signal)
+          if (currentSessionTeam(ctx) !== teamScope)
+            throw new AgentSessionDeliveryRoutingError('SENDER_FORBIDDEN', 'The active Session changed team')
+          assertSessionToolsAuthorized(ctx, teamScope, false)
+        }
+        return listSessionDeliveries(ctx, args, teamScope)
+      })
   )
   server.registerTool(
     SESSION_SEND_TOOL_NAME,
     {
       description:
-        'Send a durable message to another Agent Session. Sender identity is injected by the runtime and cannot be set.',
+        'Send a task or correction to an addressable Agent Session. Set reply to completion to receive its result for review.',
       inputSchema: SessionSendInputSchema
     },
     (args) => runSessionTool(ctx, () => sendSessionMessage(ctx, args))

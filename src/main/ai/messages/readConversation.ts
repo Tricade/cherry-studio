@@ -1,10 +1,12 @@
 import * as z from 'zod'
 
+import { application } from '@application'
 import { agentSessionMessageService } from '@data/services/AgentSessionMessageService'
 import { agentSessionService } from '@data/services/AgentSessionService'
 import { messageService } from '@data/services/MessageService'
 import { temporaryChatService } from '@data/services/TemporaryChatService'
 import { topicService } from '@data/services/TopicService'
+import { isAddressableSessionInTeam, type SessionTeamScope } from '@data/services/utils/sessionTeamScope'
 import { ErrorCode, isDataApiError } from '@shared/data/api/errors'
 import type { AgentSessionMessageEntity } from '@shared/data/api/schemas/agentSessionMessages'
 import { AgentSessionMessagesListQuerySchema } from '@shared/data/api/schemas/agentSessionMessages'
@@ -66,10 +68,21 @@ function tryCandidate(
   }
 }
 
-function identifyConversation(sessionId: string): ConversationCandidate {
+function identifyConversation(sessionId: string, teamScope?: SessionTeamScope): ConversationCandidate {
+  // For project callers no other conversation store is an addressable source, even for a known ID.
+  if (typeof teamScope === 'string') {
+    if (isAddressableSessionInTeam(application.get('DbService').getDb(), sessionId, teamScope)) {
+      return { source: 'agent', sessionId }
+    }
+    throw new ConversationReadError('NOT_FOUND', `Conversation not found: ${sessionId}`)
+  }
   const candidates = [
     tryCandidate(() => topicService.getById(sessionId), 'topic', sessionId),
-    tryCandidate(() => agentSessionService.getById(sessionId), 'agent', sessionId),
+    teamScope === undefined
+      ? tryCandidate(() => agentSessionService.getById(sessionId), 'agent', sessionId)
+      : isAddressableSessionInTeam(application.get('DbService').getDb(), sessionId, teamScope)
+        ? { source: 'agent' as const, sessionId }
+        : null,
     temporaryChatService.hasTopic(sessionId) ? { source: 'temporary' as const, sessionId } : null
   ].filter((candidate): candidate is ConversationCandidate => candidate !== null)
 
@@ -145,9 +158,9 @@ function readExactMessage(
   }
 }
 
-export function readConversation(input: ReadConversationInput) {
+export function readConversation(input: ReadConversationInput, teamScope?: SessionTeamScope) {
   assertValidQuery(input)
-  const candidate = identifyConversation(input.sessionId)
+  const candidate = identifyConversation(input.sessionId, teamScope)
   assertSourceQuery(candidate.source, input)
 
   if (input.messageId) {

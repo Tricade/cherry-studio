@@ -22,7 +22,13 @@ import { agentProjectService } from '@data/services/AgentProjectService'
 import { agentSessionReadModelEffects, agentSessionService } from '@data/services/AgentSessionService'
 import { registerDataService } from '@data/services/dataServiceRegistry'
 import { timestampToISO } from '@data/services/utils/rowMappers'
+import {
+  isAddressableSessionInTeam,
+  sessionTeamFilter,
+  type SessionTeamScope
+} from '@data/services/utils/sessionTeamScope'
 import { loggerService } from '@logger'
+import { Emitter } from '@main/core/lifecycle'
 import { buildSearchSnippet } from '@main/utils/searchSnippet'
 import {
   extractFtsTokens,
@@ -137,6 +143,7 @@ type SessionMessageContentSearchInput = {
 }
 
 type RankedSessionMessageSearchInput = {
+  teamScope?: SessionTeamScope
   q: string
   limit?: number
   agentId?: string
@@ -202,6 +209,32 @@ export class AgentSessionDeliveryRoutingError extends Error {
     super(message)
     this.name = 'AgentSessionDeliveryRoutingError'
   }
+}
+
+/** Recheck durable envelopes whenever another turn or its result is about to cross between sessions. */
+function canRouteSessionDelivery(
+  tx: DbOrTx,
+  parties: Pick<AgentSessionDeliveryEnvelope, 'sender' | 'receiver'>
+): boolean {
+  const { sender, receiver } = parties
+  const source = tx
+    .select({ projectId: sessionTable.projectId })
+    .from(sessionTable)
+    .where(eq(sessionTable.id, sender.sessionId))
+    .get()
+  if (!source) return false
+  if (source.projectId === null) {
+    // Personal sessions keep their existing deletion/failure notifications.
+    return !!tx
+      .select({ id: sessionTable.id })
+      .from(sessionTable)
+      .where(and(eq(sessionTable.id, receiver.sessionId), isNull(sessionTable.projectId)))
+      .get()
+  }
+  return (
+    isAddressableSessionInTeam(tx, sender.sessionId, source.projectId, sender.agentId) &&
+    isAddressableSessionInTeam(tx, receiver.sessionId, source.projectId, receiver.agentId)
+  )
 }
 
 type SaveAgentSessionMessageOptions =
@@ -297,6 +330,8 @@ function publicMessageData(data: SessionMessageRow['data']): AgentSessionMessage
 }
 
 export class AgentSessionMessageService {
+  private readonly deliveryChanged = new Emitter<string>()
+
   readWorkspaceRelocationHistory(workspaceId: string) {
     return application
       .get('DbService')
@@ -563,6 +598,12 @@ export class AgentSessionMessageService {
     const database = application.get('DbService').getDb()
     const limit = Math.min(Math.max(Math.trunc(query.limit ?? 20), 1), 100)
     const agentCondition = query.agentId ? sql`s.agent_id = ${query.agentId}` : sql`1 = 1`
+    const teamCondition =
+      sessionTeamFilter(query.teamScope, {
+        projectId: sql`s.project_id`,
+        workspaceId: sql`s.workspace_id`,
+        agentId: sql`s.agent_id`
+      }) ?? sql`1 = 1`
     const addressableCondition = query.addressableOnly
       ? sql`s.agent_id IS NOT NULL AND a.id IS NOT NULL AND a.deleted_at IS NULL`
       : sql`1 = 1`
@@ -592,6 +633,7 @@ export class AgentSessionMessageService {
             AND s.deleted_at IS NULL
           AND ${agentCondition}
           AND ${addressableCondition}
+            AND ${teamCondition}
           ${shortTermConditions.length > 0 ? sql`AND ${sql.join(shortTermConditions, sql` AND `)}` : sql``}
         ORDER BY bm25(agent_session_message_fts), sm.created_at DESC, sm.id DESC
         LIMIT ${chunkLimit}
@@ -643,6 +685,7 @@ export class AgentSessionMessageService {
           WHERE s.type = 'conversation' AND ${agentCondition}
             AND s.deleted_at IS NULL
             AND ${addressableCondition}
+            AND ${teamCondition}
             AND ${sql.join(conditions, sql` AND `)}
           ORDER BY length(sm.searchable_text), sm.created_at DESC, sm.id DESC
           LIMIT ${chunkLimit}
@@ -1421,10 +1464,22 @@ export class AgentSessionMessageService {
     const [receiverSession] = tx
       .select({ agentId: sessionTable.agentId, sessionName: sessionTable.name })
       .from(sessionTable)
-      .where(and(eq(sessionTable.id, input.receiverSessionId), isNull(sessionTable.deletedAt)))
+      .where(
+        and(
+          eq(sessionTable.id, input.receiverSessionId),
+          eq(sessionTable.type, 'conversation'),
+          isNull(sessionTable.deletedAt)
+        )
+      )
       .limit(1)
       .all()
-    if (!receiverSession) {
+    if (
+      !receiverSession ||
+      !canRouteSessionDelivery(tx, {
+        sender: { agentId: input.senderAgentId, sessionId: input.senderSessionId },
+        receiver: { agentId: receiverSession.agentId ?? '', sessionId: input.receiverSessionId }
+      })
+    ) {
       throw new AgentSessionDeliveryRoutingError(
         AGENT_SESSION_DELIVERY_ERROR_CODES.TARGET_SESSION_NOT_FOUND,
         `Target Session not found: ${input.receiverSessionId}`
@@ -1564,6 +1619,7 @@ export class AgentSessionMessageService {
       | {
           sessionId: string
           direction?: 'incoming' | 'outgoing'
+          teamScope?: SessionTeamScope
           requestId?: string
           status?: AgentSessionDeliveryStatus
           limit?: number
@@ -1571,7 +1627,26 @@ export class AgentSessionMessageService {
     legacyLimit?: number
   ): AgentSessionMessageEntity[] {
     const query = typeof input === 'string' ? { sessionId: input, limit: legacyLimit } : input
+    const db = application.get('DbService').getDb()
     const filters = [isNotNull(sessionMessagesTable.delivery)]
+    if (query.teamScope !== undefined) {
+      const sessions = db
+        .select({ id: sessionTable.id })
+        .from(sessionTable)
+        .innerJoin(agentTable, eq(agentTable.id, sessionTable.agentId))
+        .where(
+          and(
+            eq(sessionTable.type, 'conversation'),
+            isNull(sessionTable.deletedAt),
+            isNull(agentTable.deletedAt),
+            sessionTeamFilter(query.teamScope)
+          )
+        )
+      filters.push(
+        inArray(sessionMessagesTable.sessionId, sessions),
+        inArray(sessionMessagesTable.deliverySenderSessionId, sessions)
+      )
+    }
     if (query.requestId) {
       filters.push(
         or(eq(sessionMessagesTable.id, query.requestId), eq(sessionMessagesTable.deliveryInReplyTo, query.requestId))!
@@ -1591,9 +1666,7 @@ export class AgentSessionMessageService {
       filters.push(eq(sessionMessagesTable.sessionId, query.sessionId))
     }
 
-    return application
-      .get('DbService')
-      .getDb()
+    return db
       .select()
       .from(sessionMessagesTable)
       .where(and(...filters))
@@ -1601,6 +1674,41 @@ export class AgentSessionMessageService {
       .limit(Math.min(Math.max(query.limit ?? 20, 1), 100))
       .all()
       .map((row) => this.rowToEntity(row))
+  }
+
+  /** Keep the coordinator's interactive turn available for review. The durable result remains in its history. */
+  async waitForProjectDelivery(
+    sessionId: string,
+    projectId: string,
+    requestId: string,
+    signal: AbortSignal
+  ): Promise<void> {
+    signal.throwIfAborted()
+    const pending = () =>
+      this.listSessionDeliveries({ sessionId, teamScope: projectId, requestId, limit: 2 }).some(
+        (row) =>
+          row.id === requestId &&
+          row.delivery?.sender.sessionId === sessionId &&
+          row.delivery.receiver.sessionId !== sessionId &&
+          row.delivery.replyPolicy === 'completion' &&
+          (row.delivery.status === 'accepted' || row.delivery.status === 'delivering')
+      )
+    if (!pending()) return
+    const { promise, resolve } = Promise.withResolvers<void>()
+    const subscription = this.deliveryChanged.event((id) => {
+      if (id === requestId && !pending()) resolve()
+    })
+    const timer = setTimeout(resolve, 20_000)
+    const onAbort = () => resolve()
+    signal.addEventListener('abort', onAbort, { once: true })
+    try {
+      await promise
+      signal.throwIfAborted()
+    } finally {
+      clearTimeout(timer)
+      subscription.dispose()
+      signal.removeEventListener('abort', onAbort)
+    }
   }
 
   transitionSessionDelivery(
@@ -1650,6 +1758,33 @@ export class AgentSessionMessageService {
     return updated
   }
 
+  /** Only the receiver of this exact live project delivery can read team evidence without a responder. */
+  allowsProjectDeliveryRead(sessionId: string, messageId: string, assistantMessageId: string): boolean {
+    const db = application.get('DbService').getDb()
+    const row = db
+      .select({ delivery: sessionMessagesTable.delivery, configuration: agentTable.configuration })
+      .from(sessionMessagesTable)
+      .innerJoin(sessionTable, eq(sessionTable.id, sessionMessagesTable.sessionId))
+      .innerJoin(agentTable, eq(agentTable.id, sessionTable.agentId))
+      .where(
+        and(
+          eq(sessionTable.id, sessionId),
+          isNotNull(sessionTable.projectId),
+          eq(sessionMessagesTable.id, messageId),
+          eq(sessionMessagesTable.deliveryStatus, 'delivering'),
+          eq(sessionMessagesTable.deliveryTurnRef, assistantMessageId)
+        )
+      )
+      .get()
+    const mode = row?.configuration.permission_mode
+    return (
+      !!row?.delivery &&
+      row.delivery.receiver.sessionId === sessionId &&
+      (mode === 'auto' || mode === 'bypassPermissions') &&
+      canRouteSessionDelivery(db, row.delivery)
+    )
+  }
+
   claimSessionDeliveryTx(
     tx: DbOrTx,
     sessionId: string,
@@ -1658,6 +1793,9 @@ export class AgentSessionMessageService {
   ): AgentSessionMessageEntity | null {
     const existing = this.findExistingMessageRow(tx, sessionId, messageId)
     if (!existing?.delivery || existing.deliveryStatus !== 'accepted') return null
+    if (!canRouteSessionDelivery(tx, existing.delivery)) {
+      throw new AgentSessionDeliveryRoutingError('SESSION_TOOL_FORBIDDEN', 'Delivery is outside the current team')
+    }
     const delivery = { ...existing.delivery, statusAt: new Date().toISOString() }
     const row = tx
       .update(sessionMessagesTable)
@@ -1699,6 +1837,32 @@ export class AgentSessionMessageService {
         return { requestId: null, result: null }
       }
 
+      if (request.delivery.replyPolicy === 'completion') {
+        const callerExists = tx
+          .select({ id: sessionTable.id })
+          .from(sessionTable)
+          .where(and(eq(sessionTable.id, request.delivery.sender.sessionId), isNull(sessionTable.deletedAt)))
+          .limit(1)
+          .all()[0]
+        if (!callerExists || !canRouteSessionDelivery(tx, request.delivery)) {
+          tx.update(sessionMessagesTable)
+            .set({
+              deliveryStatus: 'failed',
+              deliveryTurnRef: null,
+              delivery: {
+                ...request.delivery,
+                outcome: 'failed',
+                error: callerExists
+                  ? { code: 'SESSION_TOOL_FORBIDDEN', message: 'Delivery is outside the current team' }
+                  : { code: 'CALLER_SESSION_DELETED', message: 'Caller Session was deleted' },
+                statusAt: new Date().toISOString()
+              }
+            })
+            .where(eq(sessionMessagesTable.id, request.id))
+            .run()
+          return { requestId: request.id, result: null }
+        }
+      }
       const existingResult = tx
         .select()
         .from(sessionMessagesTable)
@@ -1727,28 +1891,6 @@ export class AgentSessionMessageService {
 
       let result: AgentSessionMessageEntity | null = null
       if (request.delivery.replyPolicy === 'completion') {
-        const callerExists = tx
-          .select({ id: sessionTable.id })
-          .from(sessionTable)
-          .where(and(eq(sessionTable.id, request.delivery.sender.sessionId), isNull(sessionTable.deletedAt)))
-          .limit(1)
-          .all()[0]
-        if (!callerExists) {
-          tx.update(sessionMessagesTable)
-            .set({
-              deliveryStatus: 'failed',
-              deliveryTurnRef: null,
-              delivery: {
-                ...request.delivery,
-                outcome: 'failed',
-                error: { code: 'CALLER_SESSION_DELETED', message: 'Caller Session was deleted' },
-                statusAt: new Date().toISOString()
-              }
-            })
-            .where(eq(sessionMessagesTable.id, request.id))
-            .run()
-          return { requestId: request.id, result: null }
-        }
         const resultEnvelope: AgentSessionDeliveryEnvelope = {
           version: 1,
           sender: request.delivery.receiver,
@@ -1823,36 +1965,37 @@ export class AgentSessionMessageService {
           .where(eq(sessionMessagesTable.deliveryInReplyTo, request.id))
           .limit(1)
           .get()
-        result = !callerExists
-          ? null
-          : existingResult
-            ? existingResult.deliveryStatus === 'accepted'
-              ? this.rowToEntity(existingResult)
-              : null
-            : this.saveMessageTx(tx, {
-                sessionId: request.delivery.sender.sessionId,
-                message: {
-                  id: uuidv7(),
-                  role: 'user',
-                  status: 'success',
-                  data: terminalResultData(null, 'failed', error),
-                  delivery: {
-                    version: 1,
-                    sender: request.delivery.receiver,
-                    receiver: request.delivery.sender,
-                    senderSnapshot: request.delivery.receiverSnapshot,
-                    receiverSnapshot: request.delivery.senderSnapshot,
-                    replyPolicy: 'none',
-                    sourceMessageId: null,
-                    outcome: 'failed',
-                    error,
-                    statusAt: now
-                  },
-                  deliveryStatus: 'accepted',
-                  deliveryInReplyTo: request.id,
-                  deliverySenderSessionId: request.delivery.receiver.sessionId
-                }
-              }).entity
+        result =
+          !callerExists || !canRouteSessionDelivery(tx, request.delivery)
+            ? null
+            : existingResult
+              ? existingResult.deliveryStatus === 'accepted'
+                ? this.rowToEntity(existingResult)
+                : null
+              : this.saveMessageTx(tx, {
+                  sessionId: request.delivery.sender.sessionId,
+                  message: {
+                    id: uuidv7(),
+                    role: 'user',
+                    status: 'success',
+                    data: terminalResultData(null, 'failed', error),
+                    delivery: {
+                      version: 1,
+                      sender: request.delivery.receiver,
+                      receiver: request.delivery.sender,
+                      senderSnapshot: request.delivery.receiverSnapshot,
+                      receiverSnapshot: request.delivery.senderSnapshot,
+                      replyPolicy: 'none',
+                      sourceMessageId: null,
+                      outcome: 'failed',
+                      error,
+                      statusAt: now
+                    },
+                    deliveryStatus: 'accepted',
+                    deliveryInReplyTo: request.id,
+                    deliverySenderSessionId: request.delivery.receiver.sessionId
+                  }
+                }).entity
       }
       tx.update(sessionMessagesTable)
         .set({
@@ -1925,7 +2068,7 @@ export class AgentSessionMessageService {
         .where(and(eq(sessionTable.id, request.delivery.sender.sessionId), isNull(sessionTable.deletedAt)))
         .limit(1)
         .all()[0]
-      if (!callerExists) continue
+      if (!callerExists || !canRouteSessionDelivery(tx, request.delivery)) continue
       results.push(
         this.saveMessageTx(tx, {
           sessionId: request.delivery.sender.sessionId,
@@ -2006,7 +2149,7 @@ export class AgentSessionMessageService {
         .where(and(eq(sessionTable.id, request.delivery.sender.sessionId), isNull(sessionTable.deletedAt)))
         .limit(1)
         .get()
-      if (!callerExists) continue
+      if (!callerExists || !canRouteSessionDelivery(tx, request.delivery)) continue
       changes.push(
         this.saveMessageTx(tx, {
           sessionId: request.delivery.sender.sessionId,
@@ -2050,6 +2193,7 @@ export class AgentSessionMessageService {
     activitySessionIds: readonly string[] = []
   ): void {
     if (changes.length === 0 && activitySessionIds.length === 0) return
+    for (const { messageId } of changes) this.deliveryChanged.fire(messageId)
     notifyDataApiDataChange([
       ...agentSessionReadModelEffects(activitySessionIds, 'projection'),
       ...changes.map(({ sessionId, messageId, kind }) => ({

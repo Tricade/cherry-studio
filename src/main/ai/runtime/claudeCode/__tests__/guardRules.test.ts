@@ -11,7 +11,13 @@ import {
   toMcpRuntimeName
 } from '@main/ai/toolApproval/builtinToolPolicy'
 import { evaluateToolGuards, type ToolGuardContext, validateToolGuardRules } from '@main/ai/toolApproval/toolGuards'
-import { SESSION_CREATE_TOOL_NAME, SESSION_SEND_TOOL_NAME } from '@shared/ai/agentSessionDelivery'
+import {
+  SESSION_CREATE_TOOL_NAME,
+  SESSION_READ_TOOL_NAME,
+  SESSION_RENAME_TOOL_NAME,
+  SESSION_SEARCH_TOOL_NAME,
+  SESSION_SEND_TOOL_NAME
+} from '@shared/ai/agentSessionDelivery'
 import { KB_MANAGE_TOOL_NAME } from '@shared/ai/builtinTools'
 
 const mocks = vi.hoisted(() => ({
@@ -440,7 +446,13 @@ describe('CLAUDE_TOOL_GUARD_RULES', () => {
     })
   })
 
-  describe.each([SESSION_CREATE_TOOL_NAME, SESSION_SEND_TOOL_NAME])('delegation approval: %s', (name) => {
+  describe.each([
+    SESSION_CREATE_TOOL_NAME,
+    SESSION_SEND_TOOL_NAME,
+    SESSION_SEARCH_TOOL_NAME,
+    SESSION_READ_TOOL_NAME,
+    SESSION_RENAME_TOOL_NAME
+  ])('delegation approval: %s', (name) => {
     const toolName = toCherryBuiltinRuntimeName(name)
 
     it.each(['auto', 'bypassPermissions'] as const)(
@@ -451,6 +463,17 @@ describe('CLAUDE_TOOL_GUARD_RULES', () => {
           effect: 'deny',
           ruleId: 'disabled-tool'
         })
+      }
+    )
+
+    it.each(['auto', 'bypassPermissions'] as const)(
+      'limits a verified project delivery in %s to evidence',
+      async (permissionMode) => {
+        const result = await evaluate(
+          makeCtx({ toolName, permissionMode, interaction: { ...HEADLESS, projectDeliveryRead: true } })
+        )
+        if (name === SESSION_READ_TOOL_NAME || name === SESSION_SEARCH_TOOL_NAME) expect(result).toBeUndefined()
+        else expect(result?.effect).toBe('deny')
       }
     )
 

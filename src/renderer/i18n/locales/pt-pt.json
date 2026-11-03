@@ -3197,7 +3197,7 @@
   "privacy_policy_update.policy": "Política de Privacidade",
   "privacy_policy_update.title": "Política de Privacidade Atualizada",
   "project.agents": "Membros da equipa",
-  "project.agents_hint": "Selecione agentes existentes. Cada um mantém a função e o modelo configurados. Inicie uma conversa separada com qualquer membro; criar uma equipa não inicia um fluxo de trabalho automático.",
+  "project.agents_hint": "Escolha agentes existentes com as suas funções e modelos. Abra a conversa com o agente que vai coordenar a equipa. Ele pode atribuir tarefas, rever respostas e pedir alterações. O modo de permissões de cada agente controla o seu acesso às conversas da equipa.",
   "project.choose_workspace": "Escolher ou adicionar uma pasta",
   "project.delete": "Eliminar projeto",
   "project.delete_confirm": "Confirmar a eliminação do projeto",

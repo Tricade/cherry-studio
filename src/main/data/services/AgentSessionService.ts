@@ -22,6 +22,11 @@ import { agentWorkspaceService, rowToAgentWorkspace } from '@data/services/Agent
 import { getDataService } from '@data/services/dataServiceRegistry'
 import { pinService } from '@data/services/PinService'
 import { nullsToUndefined, timestampToISO } from '@data/services/utils/rowMappers'
+import {
+  isAddressableSessionInTeam,
+  sessionTeamFilter,
+  type SessionTeamScope
+} from '@data/services/utils/sessionTeamScope'
 import { loggerService } from '@logger'
 import { Emitter, type Event } from '@main/core/lifecycle'
 import { buildSearchSnippet } from '@main/utils/searchSnippet'
@@ -177,6 +182,7 @@ export class AgentSessionService {
   }
 
   listAddressableByCursor(query: {
+    teamScope?: SessionTeamScope
     agentId?: string
     cursor?: string
     limit?: number
@@ -196,7 +202,7 @@ export class AgentSessionService {
       })
       .from(sessionsTable)
       .innerJoin(agentsTable, eq(sessionsTable.agentId, agentsTable.id))
-      .where(and(...filters))
+      .where(and(...filters, sessionTeamFilter(query.teamScope)))
       .orderBy(asc(sessionsTable.id))
       .limit(limit + 1)
       .all()
@@ -210,6 +216,7 @@ export class AgentSessionService {
   }
 
   searchWithMetadataEvidence(query: {
+    teamScope?: SessionTeamScope
     q: string
     limit: number
     updatedAtFrom?: number
@@ -238,7 +245,7 @@ export class AgentSessionService {
       })
       .from(sessionsTable)
       .leftJoin(agentsTable, and(eq(sessionsTable.agentId, agentsTable.id), isNull(agentsTable.deletedAt)))
-      .where(filters.length > 0 ? and(...filters) : undefined)
+      .where(and(...filters, sessionTeamFilter(query.teamScope)))
       .orderBy(desc(sessionsTable.lastActivityAt), asc(sessionsTable.id))
       .limit(limit)
       .all()
@@ -541,7 +548,7 @@ export class AgentSessionService {
    * An optional `agentId` narrows the scan to one agent's sessions — used by
    * per-agent sidebar entries to resume that agent's last conversation.
    */
-  getLatestActive(query: LatestAgentSessionQuery = {}): AgentSessionEntity | null {
+  getLatestActive(query: LatestAgentSessionQuery = {}, teamScope?: SessionTeamScope): AgentSessionEntity | null {
     const db = application.get('DbService').getDb()
     const ownerFilter =
       query.agentId === 'unlinked'
@@ -554,7 +561,7 @@ export class AgentSessionService {
       .from(sessionsTable)
       .innerJoin(agentWorkspaceTable, eq(sessionsTable.workspaceId, agentWorkspaceTable.id))
       .leftJoin(agentsTable, and(eq(sessionsTable.agentId, agentsTable.id), isNull(agentsTable.deletedAt)))
-      .where(and(conversationFilter, isNull(sessionsTable.deletedAt), ownerFilter))
+      .where(and(conversationFilter, isNull(sessionsTable.deletedAt), ownerFilter, sessionTeamFilter(teamScope)))
       .orderBy(desc(sessionsTable.lastActivityAt), asc(sessionsTable.id))
       .limit(1)
       .all()
@@ -824,7 +831,7 @@ export class AgentSessionService {
     return { items: items.map((i) => i.session), nextCursor }
   }
 
-  update(id: string, dto: UpdateAgentSessionDto): AgentSessionEntity {
+  update(id: string, dto: UpdateAgentSessionDto, teamScope?: SessionTeamScope): AgentSessionEntity {
     const patch: UpdateAgentSessionDto = {}
     if (dto.name !== undefined) {
       patch.name = dto.name
@@ -839,7 +846,13 @@ export class AgentSessionService {
     if (Object.keys(patch).length === 0) return this.getById(id)
 
     const result = withSqliteErrors(
-      () => application.get('DbService').withWriteTx((tx) => this.updateTx(tx, id, patch)),
+      () =>
+        application.get('DbService').withWriteTx((tx) => {
+          if (teamScope !== undefined && !isAddressableSessionInTeam(tx, id, teamScope)) {
+            throw DataApiErrorFactory.notFound('Session', id)
+          }
+          return this.updateTx(tx, id, patch)
+        }),
       defaultHandlersFor('Session', id)
     )
     if (!result.row) throw DataApiErrorFactory.notFound('Session', id)

@@ -547,7 +547,7 @@ async function buildToolPermissions(
     const policy = findBuiltinToolPolicy(toolName, mountedServers)
     const delegationApproval =
       policy?.approval === 'delegation'
-        ? resolveDelegationApproval(snapshot.getPermissionMode(), interactionState)
+        ? resolveDelegationApproval(snapshot.getPermissionMode(), interactionState, toolName)
         : undefined
     if (delegationApproval === 'deny') {
       return { behavior: 'deny', message: HEADLESS_INTERACTIVE_TOOL_DENIAL }

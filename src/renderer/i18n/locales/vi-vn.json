@@ -3197,7 +3197,7 @@
   "privacy_policy_update.policy": "Chính sách bảo mật",
   "privacy_policy_update.title": "Chính sách Quyền riêng tư Đã cập nhật",
   "project.agents": "Thành viên nhóm",
-  "project.agents_hint": "Chọn các tác nhân hiện có. Mỗi tác nhân giữ nguyên vai trò và mô hình đã cấu hình. Bạn có thể bắt đầu cuộc trò chuyện riêng với bất kỳ thành viên nào; việc tạo nhóm không tự khởi chạy quy trình làm việc.",
+  "project.agents_hint": "Chọn các tác tử hiện có cùng vai trò và mô hình riêng. Mở cuộc trò chuyện với tác tử sẽ điều phối nhóm. Tác tử này có thể giao việc, xem xét câu trả lời và yêu cầu chỉnh sửa. Chế độ cấp quyền của mỗi tác tử quyết định quyền truy cập vào các cuộc trò chuyện của nhóm.",
   "project.choose_workspace": "Chọn hoặc thêm thư mục",
   "project.delete": "Xóa dự án",
   "project.delete_confirm": "Xác nhận xóa dự án",

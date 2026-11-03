@@ -84,6 +84,10 @@ describe('readConversation', () => {
       setAsActive: false
     })
 
+    expect(() => readConversation({ sessionId: topic.id, messageId: first.id }, 'project')).toThrowError(
+      expect.objectContaining({ code: 'NOT_FOUND' })
+    )
+    expect(readConversation({ sessionId: topic.id, messageId: first.id }, null)).toMatchObject({ source: 'topic' })
     const page = topicOf(readConversation({ sessionId: topic.id, limit: 1 }))
     expect(page.messages).toHaveLength(1)
     expect(page.nextCursor).toBeDefined()
@@ -153,6 +157,10 @@ describe('readConversation', () => {
       data: { parts: [{ type: 'text', text: 'temporary message' }] },
       status: 'success'
     })
+    expect(() => readConversation({ sessionId: temporary.id }, 'project')).toThrowError(
+      expect.objectContaining({ code: 'NOT_FOUND' })
+    )
+    expect(readConversation({ sessionId: temporary.id }, null)).toMatchObject({ source: 'temporary' })
     const temporaryResult = readConversation({ sessionId: temporary.id })
     expect(temporaryResult).toMatchObject({
       source: 'temporary',
