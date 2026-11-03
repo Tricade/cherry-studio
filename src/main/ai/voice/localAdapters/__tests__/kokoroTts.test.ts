@@ -5,9 +5,10 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { application } from '@application'
-import { KOKORO_TTS_BUNDLE_ID, VoiceModelSupport } from '@shared/ai/localVoice'
+import { KOKORO_TTS_BUNDLE_ID, KOKORO_TTS_MODEL_ID, VoiceModelSupport } from '@shared/ai/localVoice'
 
-import { createKokoroSpeechModel, getKokoroTtsStatus, kokoroSpeechDefinition, kokoroTtsSupport } from '../kokoroTts'
+import { sherpaBundleStatus, sherpaVoiceSupport } from '../sherpaResources'
+import { createSherpaSpeechModel, kokoroSpeechDefinition } from '../sherpaTts'
 
 const synthesize = vi.fn()
 const refreshStatus = vi.fn()
@@ -47,7 +48,11 @@ describe('Kokoro Chinese-English speech', () => {
       expect(input).toMatchObject({ text, voice: sid, language: 'zh-CN', speed: 1.25 })
       await writeFile(input.outputPath, wav)
     })
-    const result = await createKokoroSpeechModel({ voice, language: 'zh-CN', speed: 1.25 }).doGenerate({ text })
+    const result = await createSherpaSpeechModel(KOKORO_TTS_MODEL_ID, {
+      voice,
+      language: 'zh-CN',
+      speed: 1.25
+    }).doGenerate({ text })
     expect(result.audio).toEqual(new Uint8Array(wav))
     expect(await readdir(directory)).toEqual([])
   })
@@ -62,14 +67,16 @@ describe('Kokoro Chinese-English speech', () => {
 
   it('checks this model download independently of other speech or recognition models', () => {
     refreshStatus.mockImplementation((id) => ({ status: id === KOKORO_TTS_BUNDLE_ID ? 'not_downloaded' : 'ready' }))
-    expect(getKokoroTtsStatus()).toEqual({ status: 'not_installed', reason: 'model_required' })
+    expect(sherpaBundleStatus(KOKORO_TTS_BUNDLE_ID)).toEqual({ status: 'not_installed', reason: 'model_required' })
   })
 
   it.each([
     { voice: 'missing', language: 'zh-CN' },
     { voice: 'zf_001', language: 'ja-JP' }
   ])('rejects unsupported voice or language %j before inference', async (options) => {
-    await expect(createKokoroSpeechModel(options).doGenerate({ text: '你好' })).rejects.toMatchObject({
+    await expect(
+      createSherpaSpeechModel(KOKORO_TTS_MODEL_ID, options).doGenerate({ text: '你好' })
+    ).rejects.toMatchObject({
       reason: 'invalid_request'
     })
     expect(await readdir(directory)).toEqual([])
@@ -86,7 +93,10 @@ describe('Kokoro Chinese-English speech', () => {
       signal.throwIfAborted()
     })
     const result = Promise.resolve(
-      createKokoroSpeechModel({ voice: 'zf_001' }).doGenerate({ text: '你好 Hello', abortSignal: controller.signal })
+      createSherpaSpeechModel(KOKORO_TTS_MODEL_ID, { voice: 'zf_001' }).doGenerate({
+        text: '你好 Hello',
+        abortSignal: controller.signal
+      })
     ).catch((error) => error)
     await started.promise
     controller.abort()
@@ -105,8 +115,8 @@ describe('Kokoro Chinese-English speech', () => {
       ['darwin', 'x64'],
       ['darwin', 'arm64']
     ]) {
-      expect(kokoroTtsSupport({ platform, arch })).toBe(VoiceModelSupport.Supported)
+      expect(sherpaVoiceSupport({ platform, arch })).toBe(VoiceModelSupport.Supported)
     }
-    expect(kokoroTtsSupport({ platform: 'win32', arch: 'ia32' })).toBe(VoiceModelSupport.UnsupportedArchitecture)
+    expect(sherpaVoiceSupport({ platform: 'win32', arch: 'ia32' })).toBe(VoiceModelSupport.UnsupportedArchitecture)
   })
 })

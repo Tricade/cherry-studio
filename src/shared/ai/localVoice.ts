@@ -10,7 +10,10 @@ export const QWEN3_TTS_MODEL_ID = 'local-voice::qwen3-tts-0.6b-customvoice' as c
 export const QWEN3_TTS_BUNDLE_ID = 'qwen3-tts-0.6b-customvoice-8bit' as const
 export const KOKORO_TTS_MODEL_ID = 'local-voice::kokoro-v1.1' as const
 export const KOKORO_TTS_BUNDLE_ID = 'kokoro-multi-lang-v1.1' as const
+export const CSS10_TTS_MODEL_ID = 'local-voice::vits-css10-de' as const
+export const CSS10_TTS_BUNDLE_ID = 'vits-css10-de' as const
 export const DOWNLOADABLE_SPEECH_BUNDLES = {
+  [CSS10_TTS_MODEL_ID]: CSS10_TTS_BUNDLE_ID,
   [QWEN3_TTS_MODEL_ID]: QWEN3_TTS_BUNDLE_ID,
   [KOKORO_TTS_MODEL_ID]: KOKORO_TTS_BUNDLE_ID
 } as const
@@ -27,7 +30,10 @@ export const QWEN3_ASR_BUNDLE_ID = 'qwen3-asr-1.7b-8bit' as const
 
 export const FUNASR_BUNDLE_ID = 'funasr-nano-int8' as const
 export const FUNASR_MODEL_ID = 'local-voice::funasr-nano' as const
+export const WHISPER_ASR_MODEL_ID = 'local-voice::whisper-small-de' as const
+export const WHISPER_ASR_BUNDLE_ID = 'whisper-small-de-int8' as const
 export const DOWNLOADABLE_TRANSCRIPTION_BUNDLES = {
+  [WHISPER_ASR_MODEL_ID]: WHISPER_ASR_BUNDLE_ID,
   [FUNASR_MODEL_ID]: FUNASR_BUNDLE_ID,
   [QWEN3_ASR_MODEL_ID]: QWEN3_ASR_BUNDLE_ID
 } as const
@@ -55,6 +61,8 @@ export const VOICE_SESSION_TRIGGERS = ['manual', 'auto_read'] as const
 export type VoiceSessionTrigger = (typeof VOICE_SESSION_TRIGGERS)[number]
 
 export const LOCAL_VOICE_MODEL_IDS = [
+  WHISPER_ASR_MODEL_ID,
+  CSS10_TTS_MODEL_ID,
   APPLE_ASR_MODEL_ID,
   APPLE_TTS_MODEL_ID,
   WINDOWS_ASR_MODEL_ID,
@@ -66,11 +74,13 @@ export const LOCAL_VOICE_MODEL_IDS = [
 ] as const
 export type LocalVoiceModelId = (typeof LOCAL_VOICE_MODEL_IDS)[number]
 export type LocalSpeechModelId =
+  | typeof CSS10_TTS_MODEL_ID
   | typeof APPLE_TTS_MODEL_ID
   | typeof WINDOWS_TTS_MODEL_ID
   | typeof QWEN3_TTS_MODEL_ID
   | typeof KOKORO_TTS_MODEL_ID
 export type LocalTranscriptionModelId =
+  | typeof WHISPER_ASR_MODEL_ID
   | typeof APPLE_ASR_MODEL_ID
   | typeof WINDOWS_ASR_MODEL_ID
   | typeof FUNASR_MODEL_ID
@@ -87,6 +97,24 @@ export interface LocalVoiceModelFacts {
 }
 
 export const LOCAL_VOICE_MODELS: readonly LocalVoiceModelFacts[] = Object.freeze([
+  Object.freeze({
+    id: WHISPER_ASR_MODEL_ID,
+    providerId: 'local-voice',
+    name: 'Whisper Small INT8 (German)',
+    capabilities: Object.freeze([MODEL_CAPABILITY.AUDIO_TRANSCRIPT]),
+    inputModalities: Object.freeze([MODALITY.AUDIO]),
+    outputModalities: Object.freeze([MODALITY.TEXT]),
+    supportsStreaming: false
+  }),
+  Object.freeze({
+    id: CSS10_TTS_MODEL_ID,
+    providerId: 'local-voice',
+    name: 'Neon CSS10 (German)',
+    capabilities: Object.freeze([MODEL_CAPABILITY.AUDIO_GENERATION]),
+    inputModalities: Object.freeze([MODALITY.TEXT]),
+    outputModalities: Object.freeze([MODALITY.AUDIO]),
+    supportsStreaming: false
+  }),
   Object.freeze({
     id: QWEN3_ASR_MODEL_ID,
     providerId: 'local-voice',

@@ -47,6 +47,8 @@ import {
   DOWNLOADABLE_TRANSCRIPTION_BUNDLES,
   QWEN3_TTS_MODEL_ID,
   KOKORO_TTS_MODEL_ID,
+  CSS10_TTS_MODEL_ID,
+  WHISPER_ASR_MODEL_ID,
   DOWNLOADABLE_SPEECH_BUNDLES,
   WINDOWS_ASR_MODEL_ID,
   WINDOWS_TTS_MODEL_ID,
@@ -113,6 +115,8 @@ const MODEL_LABEL_KEYS: Record<LocalVoiceModelId, string> = {
   [QWEN3_TTS_MODEL_ID]: 'settings.voice.model.qwen3_tts',
   [KOKORO_TTS_MODEL_ID]: 'settings.voice.model.kokoro_tts',
   [FUNASR_MODEL_ID]: 'settings.voice.model.funasr',
+  [CSS10_TTS_MODEL_ID]: 'settings.voice.model.css10_de',
+  [WHISPER_ASR_MODEL_ID]: 'settings.voice.model.whisper_de',
   [QWEN3_ASR_MODEL_ID]: 'settings.voice.model.qwen3_asr',
   [WINDOWS_ASR_MODEL_ID]: 'settings.voice.model.windows_asr',
   [WINDOWS_TTS_MODEL_ID]: 'settings.voice.model.windows_tts'
@@ -922,7 +926,8 @@ function VoiceSettings() {
                 const modelId = value === EMPTY_VALUE ? '' : value
                 await setRecognitionPreferences({
                   modelId,
-                  ...(models.find((model) => model.id === modelId)?.localeSelection === null && { language: '' })
+                  ...(models.find((model) => model.id === modelId)?.localeSelection === null && { language: '' }),
+                  ...(modelId === WHISPER_ASR_MODEL_ID && { language: 'de-DE' })
                 })
               })
             }}>
@@ -1088,7 +1093,13 @@ function VoiceSettings() {
                   }
                   return
                 }
-                savePreference(() => setSpeechPreferences({ modelId: value === EMPTY_VALUE ? '' : value, voiceId: '' }))
+                savePreference(() =>
+                  setSpeechPreferences({
+                    modelId: value === EMPTY_VALUE ? '' : value,
+                    voiceId: '',
+                    ...(value === CSS10_TTS_MODEL_ID && { language: 'de-DE' })
+                  })
+                )
               }}>
               <SelectTrigger className="w-full sm:w-64" aria-label={t('settings.voice.speech.model')}>
                 <SelectValue>

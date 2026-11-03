@@ -1,6 +1,10 @@
 import { availableParallelism } from 'node:os'
 
-import type { FunAsrModelPaths, AsrSegment, AsrTranscribePayload } from '@main/ai/localModel/capabilities/asr/protocol'
+import type {
+  AsrSegment,
+  AsrTranscribePayload,
+  SherpaAsrModelPaths
+} from '@main/ai/localModel/capabilities/asr/protocol'
 import type {
   UtilityProcessHandlerContext,
   UtilityProcessLogger
@@ -19,25 +23,28 @@ function modelLoadFailure(error: unknown): Error & { code: string } {
   })
 }
 
-function getRecognizer(modelPaths: FunAsrModelPaths, logger: UtilityProcessLogger): Promise<any> {
-  const key = `asr-recognizer|${modelPaths.encoder}|${modelPaths.llm}|${modelPaths.embedding}|${modelPaths.tokenizerDir}`
-  return cacheResource(key, async () => {
-    try {
-      const { OfflineRecognizer } = getSherpa()
-      const recognizer = new OfflineRecognizer({
-        featConfig: { sampleRate: FUNASR_ASR_SAMPLE_RATE, featureDim: 80 },
-        modelConfig: {
+function getRecognizer(modelPaths: SherpaAsrModelPaths, logger: UtilityProcessLogger): Promise<any> {
+  const config =
+    'decoder' in modelPaths
+      ? {
+          whisper: { encoder: modelPaths.encoder, decoder: modelPaths.decoder, language: 'de', task: 'transcribe' },
+          tokens: modelPaths.tokens
+        }
+      : {
           funasrNano: {
             encoderAdaptor: modelPaths.encoder,
             llm: modelPaths.llm,
             embedding: modelPaths.embedding,
             tokenizer: modelPaths.tokenizerDir
           },
-          tokens: '',
-          numThreads: ASR_NUM_THREADS,
-          provider: 'cpu',
-          debug: 0
+          tokens: ''
         }
+  return cacheResource(`asr-recognizer|${JSON.stringify(config)}`, async () => {
+    try {
+      const { OfflineRecognizer } = getSherpa()
+      const recognizer = new OfflineRecognizer({
+        featConfig: { sampleRate: FUNASR_ASR_SAMPLE_RATE, featureDim: 80 },
+        modelConfig: { ...config, numThreads: ASR_NUM_THREADS, provider: 'cpu', debug: 0 }
       })
       logger.info('inference provider active', { provider: 'cpu', runtime: 'asr' })
       return recognizer
@@ -105,7 +112,22 @@ function decodeSegment(recognizer: any, samples: Float32Array): string {
   return recognizer.getResult(stream).text.trim()
 }
 
-export async function transcribeFunAsr(
+async function chunkLimit(modelPaths: SherpaAsrModelPaths, logger: UtilityProcessLogger): Promise<number> {
+  // Leave headroom for Whisper's tail padding inside its 30-second audio context.
+  if ('decoder' in modelPaths) return 25 * FUNASR_ASR_SAMPLE_RATE
+  const limits = await readFunAsrNanoLimits(modelPaths)
+  const maxChunkSamples = computeFunAsrNanoChunkSamples(limits)
+  if (limits.usedFallback) logger.warn('FunASR Nano model metadata incomplete; using documented chunk limits')
+  else
+    logger.debug('FunASR Nano chunk limits', {
+      maxTotalLen: limits.maxTotalLen,
+      samplesPerAudioToken: limits.samplesPerAudioToken,
+      maxChunkSamples
+    })
+  return maxChunkSamples
+}
+
+export async function transcribeSherpaAsr(
   input: Extract<AsrTranscribePayload, { engine: 'sherpa' }>,
   { logger }: UtilityProcessHandlerContext<never>
 ): Promise<{ text: string; segments: AsrSegment[] }> {
@@ -116,20 +138,7 @@ export async function transcribeFunAsr(
   const speechSegments = detectSpeech(detector, samples)
   if (!speechSegments.length) return { text: '', segments: [] }
 
-  // The FunASR Nano decoder generates the transcript inside the same KV window
-  // that holds the prompt and the audio tokens; oversized chunks get their
-  // tail silently dropped. Cap chunks at what the downloaded model can carry
-  // with a guaranteed output reserve instead of a fixed duration.
-  const limits = await readFunAsrNanoLimits(modelPaths)
-  const maxChunkSamples = computeFunAsrNanoChunkSamples(limits)
-  if (limits.usedFallback) logger.warn('FunASR Nano model metadata incomplete; using documented chunk limits')
-  else
-    logger.debug('FunASR Nano chunk limits', {
-      maxTotalLen: limits.maxTotalLen,
-      samplesPerAudioToken: limits.samplesPerAudioToken,
-      maxChunkSamples
-    })
-
+  const maxChunkSamples = await chunkLimit(modelPaths, logger)
   const recognizer = await getRecognizer(modelPaths, logger)
   const segments: AsrSegment[] = []
 
@@ -138,7 +147,7 @@ export async function transcribeFunAsr(
       const chunk = speech.samples.subarray(offset, offset + maxChunkSamples)
       const text = decodeSegment(recognizer, chunk)
       if (!text) {
-        logger.debug('FunASR Nano chunk decoded empty', {
+        logger.debug('Speech chunk decoded empty', {
           startSecond: (speech.start + offset) / FUNASR_ASR_SAMPLE_RATE
         })
         continue

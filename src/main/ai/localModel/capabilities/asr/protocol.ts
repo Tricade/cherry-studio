@@ -9,16 +9,25 @@ export interface FunAsrModelPaths {
   voiceActivityDetector: string
 }
 
+export interface WhisperModelPaths {
+  encoder: string
+  decoder: string
+  tokens: string
+  voiceActivityDetector: string
+}
+
+export type SherpaAsrModelPaths = FunAsrModelPaths | WhisperModelPaths
+
 export type AsrTranscribeSource =
   | { kind: 'wav'; filePath: string }
   | { kind: 'samples'; samples: Float32Array; sampleRate: number }
 
 export type AsrModelConfig =
-  | { engine: typeof AsrEngine.Sherpa; modelPaths: FunAsrModelPaths }
+  | { engine: typeof AsrEngine.Sherpa; modelPaths: SherpaAsrModelPaths }
   | { engine: typeof AsrEngine.Mlx; modelDir: string }
 
 export type AsrTranscribePayload =
-  | { engine: typeof AsrEngine.Sherpa; modelPaths: FunAsrModelPaths; source: AsrTranscribeSource }
+  | { engine: typeof AsrEngine.Sherpa; modelPaths: SherpaAsrModelPaths; source: AsrTranscribeSource }
   | { engine: typeof AsrEngine.Mlx; modelDir: string; source: Extract<AsrTranscribeSource, { kind: 'samples' }> }
 
 export interface AsrSegment {

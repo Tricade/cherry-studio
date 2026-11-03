@@ -13,8 +13,8 @@ import {
 
 import { resolveSpeechConfiguration, resolveTranscriptionConfiguration } from '../localAdapters'
 import { appleSpeechDefinition, appleTranscriptionDefinition } from '../localAdapters/apple'
-import { funAsrTranscriptionDefinition } from '../localAdapters/funasr'
 import { qwen3SpeechDefinition } from '../localAdapters/qwen3Tts'
+import { funAsrTranscriptionDefinition } from '../localAdapters/sherpaAsr'
 import { windowsSpeechDefinition, windowsTranscriptionDefinition } from '../localAdapters/windows'
 import { VoiceRuntimeError } from '../VoiceRuntimeError'
 
