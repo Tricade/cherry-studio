@@ -3197,7 +3197,7 @@
   "privacy_policy_update.policy": "隱私權政策",
   "privacy_policy_update.title": "隱私權政策更新",
   "project.agents": "團隊成員",
-  "project.agents_hint": "選擇現有的代理程式。每個代理程式都會保留已設定的角色和模型。你可以與任一成員單獨開始對話；建立團隊不會自動啟動工作流程。",
+  "project.agents_hint": "選擇現有的 Agent，保留各自的角色與模型。與負責協調的 Agent 開始對話，它可以分派任務、審查回覆並要求修改。存取團隊聊天記錄依各 Agent 的權限模式決定。",
   "project.choose_workspace": "選擇或新增資料夾",
   "project.delete": "刪除專案",
   "project.delete_confirm": "確認刪除專案",
