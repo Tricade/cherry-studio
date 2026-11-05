@@ -6,6 +6,7 @@ import {
   FileSearch,
   FileText,
   Folder,
+  FolderKanban,
   Icon,
   Languages,
   LayoutGrid,
@@ -33,6 +34,7 @@ const CodeMateIcon: SidebarIconComponent = (props) => <Code {...props} viewBox="
 export const SIDEBAR_ICON_COMPONENTS = {
   assistants: MessageSquare,
   agents: MousePointerClick,
+  projects: FolderKanban,
   paintings: Palette,
   translate: Languages,
   mini_app: LayoutGrid,

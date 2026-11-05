@@ -117,6 +117,7 @@ export type AgentSessionDisplayMode = 'time' | 'agent' | 'workdir' | 'project'
 export const SIDEBAR_FAVORITES = [
   'assistants',
   'agents',
+  'projects',
   'paintings',
   'translate',
   'mini_app',

@@ -102,6 +102,7 @@ interface AgentChatProps {
   onFileNavigationRequestChange?: (request: AgentFileNavigationRequest | null) => void
   requestFileNavigation?: AgentFileNavigationRequest
   paneManualToggle?: PaneManualToggleSignal
+  emptyLabel?: string
   missingAgentSelection?: boolean
   onCreateEmptySession?: (defaults?: CreateAgentSessionDefaults) => void | Promise<unknown>
   onMissingAgentSelectionAgentChange?: (agentId: string | null) => void | Promise<void>
@@ -166,6 +167,7 @@ const AgentChat = ({
   onFileNavigationRequestChange,
   requestFileNavigation,
   paneManualToggle,
+  emptyLabel,
   missingAgentSelection = false,
   onCreateEmptySession,
   onMissingAgentSelectionAgentChange,
@@ -439,7 +441,13 @@ const AgentChat = ({
         onSidebarToggle={onSidebarToggle}
       />
     )
-    center = <ConversationCenterState state="empty" />
+    center = emptyLabel ? (
+      <div className="flex flex-1 items-center justify-center p-6 text-center text-muted-foreground text-sm">
+        {emptyLabel}
+      </div>
+    ) : (
+      <ConversationCenterState state="empty" />
+    )
   } else {
     topBar = (
       <AgentChatNavbar
@@ -458,7 +466,7 @@ const AgentChat = ({
               selectModelLabel={t('button.select_model')}
               selectWorkspaceLabel={t('agent.session.workspace_selector.placeholder')}
               shouldAutoSelectCreatedAgent
-              agentTriggerMode={isEmptyConversation ? 'selector' : 'edit'}
+              agentTriggerMode={isEmptyConversation && !sessionSnapshot.projectId ? 'selector' : 'edit'}
               canChangeModel
               onAgentChange={handleSessionAgentChange}
               onModelSelect={handleAgentModelChange}

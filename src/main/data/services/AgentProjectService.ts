@@ -37,16 +37,19 @@ export class AgentProjectService {
   }
 
   private toEntity(tx: DbOrTx, row: AgentProjectRow): AgentProjectEntity {
+    const agentIds = tx
+      .select({ id: agentProjectMemberTable.agentId })
+      .from(agentProjectMemberTable)
+      .where(eq(agentProjectMemberTable.projectId, row.id))
+      .orderBy(asc(agentProjectMemberTable.agentId))
+      .all()
+      .map(({ id }) => id)
     return {
       ...row,
       workspace: agentWorkspaceService.getByIdTx(tx, row.workspaceId),
-      agentIds: tx
-        .select({ id: agentProjectMemberTable.agentId })
-        .from(agentProjectMemberTable)
-        .where(eq(agentProjectMemberTable.projectId, row.id))
-        .orderBy(asc(agentProjectMemberTable.agentId))
-        .all()
-        .map(({ id }) => id),
+      agentIds,
+      coordinatorAgentId:
+        row.coordinatorAgentId && agentIds.includes(row.coordinatorAgentId) ? row.coordinatorAgentId : null,
       knowledgeBaseIds: tx
         .select({ id: agentProjectKnowledgeBaseTable.knowledgeBaseId })
         .from(agentProjectKnowledgeBaseTable)
@@ -129,15 +132,28 @@ export class AgentProjectService {
     }
   }
 
+  private assertCoordinatorIsMember(coordinator: string | null | undefined, agentIds: readonly string[]): void {
+    if (coordinator && !agentIds.includes(coordinator)) {
+      throw DataApiErrorFactory.invalidOperation('set project coordinator', 'Coordinator must belong to this project')
+    }
+  }
+
   create(input: CreateAgentProjectDto): AgentProjectEntity {
     const dto = CreateAgentProjectSchema.parse(input)
+    this.assertCoordinatorIsMember(dto.coordinatorAgentId, dto.agentIds)
     const id = randomUUID()
     withSqliteErrors(
       () =>
         application.get('DbService').withWriteTx((tx) => {
           agentWorkspaceService.getByIdTx(tx, dto.workspaceId)
           tx.insert(agentProjectTable)
-            .values({ id, name: dto.name, instructions: dto.instructions, workspaceId: dto.workspaceId })
+            .values({
+              id,
+              name: dto.name,
+              instructions: dto.instructions,
+              workspaceId: dto.workspaceId,
+              coordinatorAgentId: dto.coordinatorAgentId
+            })
             .run()
           this.replaceBindings(tx, id, dto)
         }),
@@ -152,9 +168,17 @@ export class AgentProjectService {
     withSqliteErrors(
       () =>
         application.get('DbService').withWriteTx((tx) => {
-          this.getByIdTx(tx, id)
+          const project = this.getByIdTx(tx, id)
+          const agentIds = dto.agentIds ?? project.agentIds
+          this.assertCoordinatorIsMember(dto.coordinatorAgentId, agentIds)
+          const coordinator = dto.coordinatorAgentId === undefined ? project.coordinatorAgentId : dto.coordinatorAgentId
           tx.update(agentProjectTable)
-            .set({ name: dto.name, instructions: dto.instructions, updatedAt: Date.now() })
+            .set({
+              name: dto.name,
+              instructions: dto.instructions,
+              coordinatorAgentId: coordinator && agentIds.includes(coordinator) ? coordinator : null,
+              updatedAt: Date.now()
+            })
             .where(eq(agentProjectTable.id, id))
             .run()
           this.replaceBindings(tx, id, dto)

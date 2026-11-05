@@ -201,6 +201,7 @@ export const getThemeModeLabelKey = (key: string): string => {
 const sidebarIconKeyMap = {
   assistants: 'title.chat',
   agents: 'title.work',
+  projects: 'project.title',
   paintings: 'title.paintings',
   translate: 'translate.title',
   mini_app: 'miniApp.title',

@@ -661,7 +661,7 @@ vi.mock('@renderer/components/chat/resourceList/AgentResourceList', () => ({
   }
 }))
 
-vi.mock('../components/AgentCreateDialog', () => ({
+vi.mock('@renderer/components/resourceCatalog/dialogs/create/AgentCreateDialog', () => ({
   AgentCreateDialog: ({ open, onCreated }: { open?: boolean; onCreated?: (agentId: string) => void }) =>
     open ? (
       <div data-testid="agent-create-dialog">
@@ -723,7 +723,7 @@ import { useTabSelfVisuals } from '@renderer/hooks/tab'
 import { EVENT_NAMES, EventEmitter } from '@renderer/services/EventService'
 import { toast } from '@renderer/services/toast'
 
-import AgentPage from '../AgentPage'
+import AgentPage, { AgentWorkspace } from '../AgentPage'
 
 describe('AgentPage', () => {
   beforeEach(() => {
@@ -895,7 +895,7 @@ describe('AgentPage', () => {
     activeSessionMocks.session = taskSession
     activeSessionMocks.sessionSource = 'query'
 
-    render(<AgentPage />)
+    const { rerender } = render(<AgentPage />)
 
     await waitFor(() =>
       expect(agentPageMocks.navigate).toHaveBeenCalledWith({
@@ -911,6 +911,7 @@ describe('AgentPage', () => {
     expect(agentPageMocks.dataApiPost).not.toHaveBeenCalled()
 
     agentPageMocks.routeSearch = { sessionId: 'session-task-chat' }
+    rerender(<AgentPage />)
     act(() => {
       agentPageMocks.composerLaunchOptions.onSent()
     })
@@ -2980,6 +2981,49 @@ describe('AgentPage', () => {
       search: { sessionId: 'session-agent-a' },
       replace: true
     })
+  })
+
+  it('creates and opens a team chat in the workspace without navigating to Agents', async () => {
+    const user = userEvent.setup()
+    const project = {
+      id: 'project-a',
+      name: 'Project A',
+      instructions: '',
+      workspaceId: agentPageMocks.persistedSession.workspaceId,
+      workspace: { ...agentPageMocks.persistedSession.workspace, type: 'user' as const },
+      agentIds: ['agent-a'],
+      knowledgeBaseIds: [],
+      createdAt: agentPageMocks.persistedSession.createdAt,
+      updatedAt: agentPageMocks.persistedSession.updatedAt
+    }
+    const onSessionChange = vi.fn()
+    agentPageMocks.dataApiPost.mockResolvedValueOnce({ ...agentPageMocks.persistedSession, projectId: project.id })
+    render(
+      <AgentWorkspace
+        routeSearch={{}}
+        projectView={{
+          project,
+          onSessionChange,
+          renderSidebar: ({ createSession }) => (
+            <button type="button" onClick={() => createSession('agent-a')}>
+              New project chat
+            </button>
+          )
+        }}
+      />
+    )
+    await user.click(screen.getByRole('button', { name: 'New project chat' }))
+    await waitFor(() => expect(onSessionChange).toHaveBeenCalledWith('session-created'))
+    expect(agentPageMocks.dataApiPost).toHaveBeenCalledWith('/agent-sessions', {
+      body: {
+        agentId: 'agent-a',
+        projectId: project.id,
+        name: '',
+        workspace: { type: 'user', workspaceId: project.workspaceId }
+      }
+    })
+    expect(screen.getByTestId('active-session')).toHaveTextContent('session-created')
+    expect(agentPageMocks.navigate).not.toHaveBeenCalled()
   })
 
   it('records the visible agent reported by the chat body', async () => {

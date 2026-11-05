@@ -2,6 +2,7 @@ import { application } from '@application'
 import { loggerService } from '@logger'
 import { cherryInOAuthService } from '@main/services/oauth/CherryInOAuthService'
 import type { ProviderQuotaReport } from '@shared/ipc/schemas/providerQuota'
+import { supportsProviderQuota } from '@shared/utils/providerQuota'
 
 import { getClaudeQuota } from './claudeQuota'
 import { getCodexQuota } from './codexQuota'
@@ -11,8 +12,7 @@ const logger = loggerService.withContext('ProviderQuota')
 const pending = new Map<string, Promise<ProviderQuotaReport>>()
 
 async function read(providerId: string): Promise<ProviderQuotaReport> {
-  if (!['openai-codex', 'claude-code', 'cherryin'].includes(providerId))
-    return unavailableQuota(providerId, 'unsupported')
+  if (!supportsProviderQuota(providerId)) return unavailableQuota(providerId, 'unsupported')
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 30_000)
   timeout.unref()

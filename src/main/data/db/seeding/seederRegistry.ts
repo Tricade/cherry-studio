@@ -14,6 +14,7 @@ import { MiniAppSeeder } from './seeders/miniAppSeeder'
 import { PoeChatEndpointUpgradeSeeder } from './seeders/PoeChatEndpointUpgradeSeeder'
 import { PreferenceSeeder } from './seeders/preferenceSeeder'
 import { PresetProviderSeeder } from './seeders/presetProviderSeeder'
+import { ProjectsSidebarSeeder } from './seeders/projectsSidebarSeeder'
 import { RetiredAgentRuntimeSeeder } from './seeders/RetiredAgentRuntimeSeeder'
 import { SidebarShortcutMigrationSeeder } from './seeders/sidebarShortcutMigrationSeeder'
 import { TranslateLanguageSeeder } from './seeders/translateLanguageSeeder'
@@ -44,6 +45,7 @@ export const seeders: ISeeder[] = [
   new WebSearchPreferenceUpgradeSeeder(),
   new SidebarShortcutMigrationSeeder(),
   new PreferenceSeeder(),
+  new ProjectsSidebarSeeder(),
   new TranslateLanguageSeeder(),
   new LocalModelSeeder(),
   new MiniAppSeeder(),

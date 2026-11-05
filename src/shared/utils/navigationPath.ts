@@ -46,6 +46,7 @@ const KNOWN_NAVIGATION_ROUTES = [
   '/app/code',
   '/app/launchpad',
   '/app/agents',
+  '/app/projects',
   '/settings/general',
   '/settings/provider',
   '/settings/model',

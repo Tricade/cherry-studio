@@ -9,6 +9,7 @@ export const agentProjectTable = sqliteTable('agent_project', {
   id: uuidPrimaryKey(),
   name: text().notNull(),
   instructions: text().notNull().default(''),
+  coordinatorAgentId: text(),
   workspaceId: text()
     .notNull()
     .unique()

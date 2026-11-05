@@ -32,7 +32,7 @@ export const ProviderQuotaReportSchema = z.discriminatedUnion('status', [
   z.object({
     status: z.literal('available'),
     providerId: z.string(),
-    source: z.enum(['codex-cli', 'claude-cli', 'cherryin-oauth']),
+    source: z.enum(['codex-oauth', 'claude-cli', 'cherryin-oauth']),
     accountLabel: z.string(),
     plan: nullableText,
     fetchedAt: z.iso.datetime(),

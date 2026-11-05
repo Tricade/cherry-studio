@@ -9,6 +9,7 @@ export const AgentProjectEntitySchema = z.strictObject({
   workspaceId: z.string().min(1),
   workspace: AgentWorkspaceEntitySchema,
   agentIds: z.array(z.string().min(1)).max(200),
+  coordinatorAgentId: z.string().min(1).nullable().optional(),
   knowledgeBaseIds: z.array(z.string().min(1)).max(200),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime()
@@ -20,6 +21,7 @@ export const CreateAgentProjectSchema = AgentProjectEntitySchema.pick({
   instructions: true,
   workspaceId: true,
   agentIds: true,
+  coordinatorAgentId: true,
   knowledgeBaseIds: true
 })
 export const UpdateAgentProjectSchema = CreateAgentProjectSchema.omit({ workspaceId: true }).partial()

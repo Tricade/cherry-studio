@@ -16,12 +16,11 @@ import {
   SelectValue
 } from '@cherrystudio/ui'
 import { useCloseBeforeAction } from '@renderer/hooks/useCloseBeforeAction'
-import { DEFAULT_KNOWLEDGE_GROUP_LABEL_KEY } from '@renderer/pages/knowledge/utils/group'
+import { useEmbeddingDimensions } from '@renderer/hooks/useEmbeddingDimensions'
 import { formatErrorMessageWithPrefix } from '@renderer/utils/error'
 import type { Group } from '@shared/data/types/group'
 import type { CreateKnowledgeBaseDto, KnowledgeBase } from '@shared/data/types/knowledge'
 
-import { useEmbeddingDimensions } from '../hooks/useEmbeddingDimensions'
 import {
   KnowledgeDialogBody,
   KnowledgeDialogField,
@@ -228,10 +227,10 @@ const CreateKnowledgeBaseDialogRoot = ({
                     }))
                   }>
                   <SelectTrigger size="sm" className="w-full">
-                    <SelectValue placeholder={t(DEFAULT_KNOWLEDGE_GROUP_LABEL_KEY)} />
+                    <SelectValue placeholder={t('knowledge.groups.default')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={DEFAULT_GROUP_OPTION_VALUE}>{t(DEFAULT_KNOWLEDGE_GROUP_LABEL_KEY)}</SelectItem>
+                    <SelectItem value={DEFAULT_GROUP_OPTION_VALUE}>{t('knowledge.groups.default')}</SelectItem>
                     {groups.map((group) => (
                       <SelectItem key={group.id} value={group.id}>
                         {group.name}

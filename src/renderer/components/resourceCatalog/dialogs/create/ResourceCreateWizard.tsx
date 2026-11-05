@@ -32,6 +32,7 @@ type ResourceCreateWizardProps = {
   onSubmit: (values: ResourceCreateWizardValues) => Promise<void> | void
   modelFilter?: ModelSelectorFilter
   isSubmitting?: boolean
+  includeKnowledge?: boolean
   /** Seeds the name field when the caller already knows it (e.g. the picker's search query). */
   initialName?: string
 }
@@ -132,6 +133,7 @@ export function ResourceCreateWizard({
   onSubmit,
   modelFilter,
   isSubmitting = false,
+  includeKnowledge = true,
   initialName
 }: ResourceCreateWizardProps) {
   const { t } = useTranslation()
@@ -174,8 +176,13 @@ export function ResourceCreateWizard({
 
     const capability = { id: 'capability' as const, label: t('library.config.dialogs.create.step.capability') }
     const caps = AGENT_RUNTIME_CAPABILITIES[agentType]
-    return [basic, systemPrompt, ...(caps.skills ? [capability] : []), ...(caps.knowledgeBases ? [knowledge] : [])]
-  }, [agentType, kind, t])
+    return [
+      basic,
+      systemPrompt,
+      ...(caps.skills ? [capability] : []),
+      ...(includeKnowledge && caps.knowledgeBases ? [knowledge] : [])
+    ]
+  }, [agentType, includeKnowledge, kind, t])
 
   useEffect(() => {
     setStepIndex((index) => Math.min(index, steps.length - 1))

@@ -60,6 +60,10 @@ const SIDEBAR_APP_DEFINITIONS = [
     }
   },
   {
+    id: 'projects',
+    routePrefix: '/app/projects'
+  },
+  {
     id: 'assistants',
     // `routePrefix` must stay a string literal — the knowledge-manifest generator reads it
     // with ts-morph. `conversationRoute` below carries the same path from the shared contract.

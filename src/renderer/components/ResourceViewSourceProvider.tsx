@@ -207,7 +207,9 @@ export function ResourceViewSourceProvider({ children }: { children: ReactNode }
     return tabs.some((tab) => tab.type === 'route' && !tab.isDormant && tabBelongsToApp(app, tab.url))
   }, [tabs])
   const agentSessionsEnabled = useMemo(
-    () => shouldLoadResourceViewSource(tabs, activeTabId, 'agents'),
+    () =>
+      shouldLoadResourceViewSource(tabs, activeTabId, 'agents') ||
+      shouldLoadResourceViewSource(tabs, activeTabId, 'projects'),
     [activeTabId, tabs]
   )
   const assistantTopicsSource = useCommittedAssistantTopicsSource(assistantTopicsEnabled, retainAssistantTopicsView)
