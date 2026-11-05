@@ -100,11 +100,9 @@ export function ProviderQuotaDetails({
                     <CircularProgress value={displayedPercent} size={24} strokeWidth={3} />
                   </span>
                 )}
-                {displayedPercent === null
-                  ? unknown
-                  : t(compact ? 'settings.usage.quota.remaining' : 'settings.usage.quota.used', {
-                      value: percent(displayedPercent)
-                    })}
+                {t(compact ? 'settings.usage.quota.remaining' : 'settings.usage.quota.used', {
+                  value: displayedPercent === null ? unknown : percent(displayedPercent)
+                })}
               </span>
             </div>
             <p className="text-muted-foreground text-xs">
