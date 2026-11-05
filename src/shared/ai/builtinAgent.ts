@@ -8,6 +8,10 @@ export const CHERRY_SUPPORT_AGENT_ID = 'cherry-support'
 
 export type BuiltinAgentRole = (typeof BUILTIN_AGENT_ROLE)[keyof typeof BUILTIN_AGENT_ROLE]
 
-export function isProtectedBuiltinAgentRole(role: unknown): role is BuiltinAgentRole {
+export function isBuiltinAgentRole(role: unknown): role is BuiltinAgentRole {
   return Object.values(BUILTIN_AGENT_ROLE).includes(role as BuiltinAgentRole)
+}
+
+export function isProtectedBuiltinAgentRole(role: unknown): boolean {
+  return role === BUILTIN_AGENT_ROLE.DOCTOR
 }

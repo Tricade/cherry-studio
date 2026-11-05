@@ -1,0 +1,5 @@
+# Bilingual-pair consistency record (docs/dev/i18n/README.md).
+# After editing either side, update its counterpart and re-record with:
+#   pnpm docs:check-pairing --write .agents/notes/implemented/bug-fix/2026-11-05-builtin-agent-removal-and-cherryai-guest.md
+2026-11-05-builtin-agent-removal-and-cherryai-guest.md: dbb1d7b37d9216d26783c038a0d9510cbe033a8a
+2026-11-05-builtin-agent-removal-and-cherryai-guest.zh.md: 85fc80bdee45b63101a260b671c3ee86ca29af5d

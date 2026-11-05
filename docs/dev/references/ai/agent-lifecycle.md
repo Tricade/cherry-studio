@@ -93,6 +93,11 @@ deletes all related Sessions, including archived ones, in the Agent transaction;
 unrelated Sessions and user workspace directories are preserved. There is no Undo
 for permanent deletion. Archived-Agent purge still retains related Sessions.
 
+Cherry Assistant and Cherry Support use the same archive and delete actions. Their
+removal is recorded in the Agent transaction, so seeders and built-in session
+entry points do not recreate them after purge. Restoring the Agent in the archive
+clears the removal record.
+
 Assistant menus follow the same product contract through
 `trash.assistant.delete_permanently`: `TrashService` owns topic dispatch locks and
 busy checks, and `AssistantService` commits owner and optional topic deletion

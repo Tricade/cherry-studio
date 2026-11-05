@@ -9,7 +9,7 @@ import { AGENT_WORKSPACE_TYPE } from '@shared/data/api/schemas/agentWorkspaces'
 
 import { loadBuiltinAgentEnsureInput } from './ensureBuiltinAgent'
 
-/** Restore Cherry Assistant when needed and create a fresh system session atomically. */
+/** Create a fresh system session on Cherry Assistant unless the user removed it. */
 export function createBuiltinAssistantSession(): AgentSessionEntity {
   const assistantInput = loadBuiltinAgentEnsureInput(BUILTIN_AGENT_ROLE.ASSISTANT)
   const sessionId = uuidv4()

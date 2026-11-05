@@ -30,5 +30,10 @@ export const entries: SettingsSearchEntry[] = [
     titleKey: 'settings.models.painting_model',
     groupKey: 'settings.model',
     descriptionKey: 'settings.models.painting_model_description'
+  },
+  {
+    anchorId: 'cherryai-guest',
+    titleKey: 'settings.models.cherryai_guest.label',
+    groupKey: 'settings.model'
   }
 ]

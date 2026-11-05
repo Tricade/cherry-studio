@@ -21,7 +21,7 @@ import {
   isPermanentDeletionToolName
 } from './assistantCommandSafety'
 
-/** Every built-in role is protected — see `isProtectedBuiltinAgentRole`. */
+/** Tool restrictions apply to every built-in role, independently of library deletion. */
 const PROTECTED_BUILTIN_ROLES: readonly string[] = Object.values(BUILTIN_AGENT_ROLE)
 
 const destructiveBuiltinOperation = (ctx: ToolGuardContext): GuardHit | null => {

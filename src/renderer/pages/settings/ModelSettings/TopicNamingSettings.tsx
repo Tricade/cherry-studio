@@ -16,7 +16,7 @@ import {
 } from '@cherrystudio/ui'
 import { usePreference } from '@data/hooks/usePreference'
 import ResetIcon from '@renderer/components/icons/ResetIcon'
-import { SettingSubtitle } from '@renderer/components/SettingsPrimitives'
+import { SettingDescription, SettingSubtitle } from '@renderer/components/SettingsPrimitives'
 
 export const TopicNamingSettings = () => {
   const [enableTopicNaming, setEnableTopicNaming] = usePreference('topic.naming.enabled')
@@ -34,8 +34,13 @@ export const TopicNamingSettings = () => {
       <ColFlex className="items-stretch rounded-md border border-border-subtle">
         <RowFlex className="min-h-11 items-center justify-between gap-4 px-3 py-2.5">
           <div className="text-foreground text-sm">{t('settings.models.topic_naming.auto')}</div>
-          <Switch checked={enableTopicNaming} onCheckedChange={setEnableTopicNaming} />
+          <Switch
+            aria-label={t('settings.models.topic_naming.auto')}
+            checked={enableTopicNaming}
+            onCheckedChange={setEnableTopicNaming}
+          />
         </RowFlex>
+        <SettingDescription className="px-3 pb-2.5">{t('settings.models.topic_naming.privacy')}</SettingDescription>
 
         <Divider className="m-0" />
 
