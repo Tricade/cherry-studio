@@ -34,6 +34,8 @@
 
 # 🍒 Cherry Studio
 
+**Tricade-Fork:** Projektteams, Kontingente für angemeldete Konten, deutsche Offline-Sprachmodelle und mehr Kontrolle über Datenübertragungen. [Änderungen und Screenshots auf Deutsch](docs/fork/README.md) · [Originalprojekt](https://github.com/CherryHQ/cherry-studio)
+
 Cherry Studio is an AI workstation for Windows, macOS, and Linux. Chat with multiple models, work with agents, build knowledge bases, create images, and automate everyday tasks in one place.
 
 **[Download Desktop](https://cherryai.com/download)** · **[Getting Started](https://cherryai.com/docs/en/getting-started/quick-start/)**
