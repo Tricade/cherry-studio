@@ -288,17 +288,17 @@ export class GuestSession {
 rejects pending operations; snapshots are serialized and discarded if the document changes mid-capture.
 Scoped snapshots do not replace the full-page diff baseline.
 
-PR A attach sequence (`GuestSession.ensureAttached`): `attach('1.3')` → `Page.enable`,
-`Runtime.enable`, `DOM.enable`, `Accessibility.enable` → `Page.getFrameTree`. Concurrent callers
-share initialization. Main-frame navigation and debugger detach invalidate refs and the previous
-snapshot; the ref counter never resets within the session. Dialog open/closed events update state.
+The debugger attaches with `attach('1.3')`, enables Page, DOM and Accessibility, and reads the
+frame tree. Concurrent callers share initialization. Main-frame navigation and debugger detach
+invalidate refs and the previous snapshot; the ref counter never resets within the session.
+Dialog events update the pending dialog state.
 
-PR B adds download tracking and the Network events needed for settling. PR3 adds console/network
-inspection and typed consumed events via `ProtocolMapping.Events`. `BrowserInspection` belongs to
-the guest, records only managed sessions, retains recent history across navigation and clears on
-detach/disposal. Managed-tab readiness enables Runtime and Network after the initial blank document;
-GUI navigation waits for that readiness so its initial requests are captured. Annotation-only borrowed
-guests remain lazy. Network inspection and browser result URLs omit credentials, the entire query string,
+Managed-tab readiness enables Network before navigation so its initial requests are captured.
+Console inspection, annotation capture and WebMCP discovery enable Runtime on demand and share
+that subscription for the attachment. `recordingStarted` marks the console read that enabled it.
+The first read can include earlier messages retained by Chromium; that history is limited to what
+the target replays. `BrowserInspection` keeps recent observed history across navigation and clears it
+on detach or disposal. Network inspection and browser result URLs omit credentials, the entire query string,
 and the fragment. Unsupported schemes are reduced to the scheme and `[content omitted]`.
 Relative snapshot links also omit queries and fragments; element references preserve their original action.
 This does not redact arbitrary page content or secrets embedded in URL paths.

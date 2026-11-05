@@ -50,8 +50,9 @@ The synchronous `resolveRef()` lookup stays side-effect-free; failed actions are
 
 `find()` queries exact accessible role/name and returns at most 100 refs, including offscreen
 elements, without replacing the snapshot diff baseline. Managed queries use the same focus
-emulation as actions to let hidden-page AX updates complete. Managed sessions record console output,
-uncaught exceptions and network request summaries in owned `BrowserInspection` buffers.
+emulation as actions to let hidden-page AX updates complete. Managed sessions track network requests.
+Console and exception events are subscribed to when console inspection, annotations or WebMCP need
+Runtime. The target can replay buffered messages when that subscription starts.
 Each buffer holds 200 entries; page text fields cap at 2,000 characters and returned entry arrays
 at 40,000 serialized characters. Navigation preserves recent history; detach/disposal clears it.
 Reads can clear matching console levels or all requests without affecting network settling.

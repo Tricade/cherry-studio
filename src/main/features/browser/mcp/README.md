@@ -81,6 +81,8 @@ belongs to the source tab, so observe the new tab explicitly. An `execute` inter
 
 Inspection tools use the same result envelope and untrusted-data notice. `find` adds `matches`;
 console/network tools add `messages` / `requests`. Each includes `truncated` for the result limit.
+`recordingStarted` is true when a console read starts the Runtime subscription. Chromium can
+replay earlier console messages on activation; the available history depends on the target's buffer.
 Console and network history keep 200 entries per managed tab across navigation, with 2,000-character
 text fields and 40,000-character entry-array output caps. An oversized result returns the newest
 entries in chronological order; `clear` also removes matching entries omitted from that result.

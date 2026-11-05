@@ -1,0 +1,5 @@
+# Bilingual-pair consistency record (docs/dev/i18n/README.md).
+# After editing either side, update its counterpart and re-record with:
+#   pnpm docs:check-pairing --write .agents/notes/implemented/bug-fix/2026-11-05-browser-runtime-on-demand.md
+2026-11-05-browser-runtime-on-demand.md: 6db0de78d654c8f2945741b722a6951a97f1c848
+2026-11-05-browser-runtime-on-demand.zh.md: 3d87d8f2951f2be45bbcacfe2d037f86a2342f38
