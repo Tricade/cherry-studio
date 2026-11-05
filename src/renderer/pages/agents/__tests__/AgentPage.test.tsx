@@ -661,7 +661,7 @@ vi.mock('@renderer/components/chat/resourceList/AgentResourceList', () => ({
   }
 }))
 
-vi.mock('../components/AgentCreateDialog', () => ({
+vi.mock('@renderer/components/resourceCatalog/dialogs/create/AgentCreateDialog', () => ({
   AgentCreateDialog: ({ open, onCreated }: { open?: boolean; onCreated?: (agentId: string) => void }) =>
     open ? (
       <div data-testid="agent-create-dialog">

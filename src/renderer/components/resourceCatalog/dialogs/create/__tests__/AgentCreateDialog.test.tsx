@@ -22,7 +22,7 @@ vi.mock('@logger', () => ({
   loggerService: { withContext: () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn() }) }
 }))
 
-vi.mock('@renderer/components/resourceCatalog/dialogs/create', () => ({
+vi.mock('../ResourceCreateWizard', () => ({
   ResourceCreateWizard: (props: any) => {
     mocks.createDialogProps = props
     return (

@@ -1,15 +1,24 @@
 import { MockUseDataApiUtils, mockUseMutation, mockUseQuery } from '@test-mocks/renderer/useDataApi'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import i18n from '@renderer/i18n/resolver'
 import type { AgentProjectEntity, CreateAgentProjectDto } from '@shared/data/api/schemas/agentProjects'
 import type { KnowledgeBaseListItem } from '@shared/data/api/schemas/knowledges'
 
-import { ProjectsDialog } from '../ProjectsDialog'
+import { ProjectsPage } from '../ProjectsPage'
 
 vi.unmock('@cherrystudio/ui')
+
+const openRoute = vi.hoisted(() => vi.fn())
+vi.mock('@renderer/services/mainWindowNavigation', () => ({ openRoute }))
+
+function Page({ initialProjectId }: { initialProjectId?: string }) {
+  const [projectId, setProjectId] = useState(initialProjectId)
+  return <ProjectsPage projectId={projectId} onProjectIdChange={setProjectId} />
+}
 
 const originalScrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView')
 beforeAll(() => Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() }))
@@ -39,6 +48,7 @@ const save = vi.fn(async ({ body }: { body: CreateAgentProjectDto }) => {
   projects = [project]
   return project
 })
+const createSession = vi.fn(async () => ({ id: 'project-session' }))
 const remove = vi.fn(async () => {
   projects = []
 })
@@ -68,8 +78,8 @@ beforeEach(async () => {
     refetch,
     mutate: vi.fn() as never
   }))
-  mockUseMutation.mockImplementation((method) => ({
-    trigger: (method === 'DELETE' ? remove : save) as never,
+  mockUseMutation.mockImplementation((method, path) => ({
+    trigger: (path === '/agent-sessions' ? createSession : method === 'DELETE' ? remove : save) as never,
     isLoading: false,
     error: undefined
   }))
@@ -86,11 +96,10 @@ beforeEach(async () => {
   )
 })
 
-describe('ProjectsDialog', () => {
+describe('ProjectsPage', () => {
   it('creates an explicit team and starts the selected member in that project workspace', async () => {
     const user = userEvent.setup()
-    const onStart = vi.fn()
-    render(<ProjectsDialog onClose={vi.fn()} onStart={onStart} />)
+    render(<Page />)
     await user.type(await screen.findByLabelText('Project name'), 'Website')
     await user.type(screen.getByLabelText('Shared project instructions'), 'Use primary sources.')
     await user.click(screen.getByRole('button', { name: 'Choose or add a folder' }))
@@ -99,20 +108,22 @@ describe('ProjectsDialog', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Coder' }))
     await user.click(screen.getByRole('checkbox', { name: 'Shared research' }))
     await user.click(screen.getByRole('button', { name: 'Save and chat with Coder' }))
-    await waitFor(() =>
-      expect(onStart).toHaveBeenCalledWith({
+    await waitFor(() => expect(openRoute).toHaveBeenCalledWith('/app/agents', { sessionId: 'project-session' }))
+    expect(createSession).toHaveBeenCalledWith({
+      body: {
+        name: '',
         projectId: 'project',
         agentId: 'coder',
         workspace: { type: 'user', workspaceId: 'folder' }
-      })
-    )
+      }
+    })
     expect(projects[0]).toMatchObject({
       name: 'Website',
       instructions: 'Use primary sources.',
       agentIds: ['planner', 'coder'],
       knowledgeBaseIds: ['shared']
     })
-    expect(screen.getByRole('button', { name: 'Project folder' })).toBeDisabled()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Project folder' })).toBeDisabled())
   })
 
   it('requires an explicit deletion confirmation and retains the project when deletion is refused', async () => {
@@ -131,7 +142,7 @@ describe('ProjectsDialog', () => {
     ]
     remove.mockRejectedValueOnce(new Error('Remove the project sessions, including trash, first'))
     const user = userEvent.setup()
-    render(<ProjectsDialog initialProjectId="project" onClose={vi.fn()} onStart={vi.fn()} />)
+    render(<Page initialProjectId="project" />)
     await user.click(await screen.findByRole('button', { name: 'Delete project' }))
     expect(remove).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'Confirm project deletion' }))

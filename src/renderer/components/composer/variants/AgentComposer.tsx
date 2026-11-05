@@ -117,6 +117,7 @@ import {
   writeAgentDraftCache
 } from './agent/agentDraftCache'
 import { buildAgentFilePartsForAttachments, toAccessiblePaths } from './agent/agentFileParts'
+import { ComposerQuotaButton } from './agent/ComposerQuotaButton'
 import { createAttachmentFromPath, useAgentResourceMentionSource } from './agent/useAgentResourceMentionSource'
 import {
   AGENT_MANAGED_TOKEN_KINDS,
@@ -1590,6 +1591,7 @@ const AgentComposerInner = ({
         />
       ) : null}
       <AgentComposerContextUsage model={model} sessionId={sessionId} />
+      {!launchOptions?.editing ? <ComposerQuotaButton providerId={model?.providerId} /> : null}
       <ComposerDictationButton inputAdapter={inputAdapter} />
     </>
   )

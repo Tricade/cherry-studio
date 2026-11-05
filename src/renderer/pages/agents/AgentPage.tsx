@@ -23,6 +23,7 @@ import {
 } from '@renderer/components/GlobalSearch/globalSearchSelectionEvents'
 import HistoryRecordsView from '@renderer/components/history/HistoryRecordsView'
 import { ConversationResourceView } from '@renderer/components/resourceCatalog/conversation'
+import { AgentCreateDialog } from '@renderer/components/resourceCatalog/dialogs/create'
 import { usePersistCache } from '@renderer/data/hooks/useCache'
 import { useInvalidateCache } from '@renderer/data/hooks/useDataApi'
 import { resolveTemplate } from '@renderer/data/utils/dataApiPath'
@@ -36,6 +37,7 @@ import { useConversationCenterSurface } from '@renderer/hooks/useConversationCen
 import { useConversationLocateRequest } from '@renderer/hooks/useConversationLocateRequest'
 import { useConversationShellPaneState } from '@renderer/hooks/useConversationShellPaneState'
 import { EVENT_NAMES, EventEmitter } from '@renderer/services/EventService'
+import { openRoute } from '@renderer/services/mainWindowNavigation'
 import type { ResourceListRevealPayload } from '@renderer/services/resourceListRevealEvents'
 import { toast } from '@renderer/services/toast'
 import type { AppRouter } from '@renderer/types/router'
@@ -53,10 +55,8 @@ import type { InstalledSkill } from '@shared/data/types/agent'
 
 import AgentChat from './AgentChat'
 import AgentSidePanel from './AgentSidePanel'
-import { AgentCreateDialog } from './components/AgentCreateDialog'
 import type { AgentFileNavigationRequest } from './components/AgentRightPane'
 import { AgentTabRuntime } from './components/AgentTabRuntime'
-import { ProjectsDialog } from './components/ProjectsDialog'
 import Sessions from './components/Sessions'
 import {
   createFeedbackComposerLaunch,
@@ -232,8 +232,10 @@ const AgentPage = () => {
   const [missingAgentSelection, setMissingAgentSelection] = useState(false)
   const [pendingSessionDefaults, setPendingSessionDefaults] = useState<CreateAgentSessionDefaults | null>(null)
   const [agentCreateOpen, setAgentCreateOpen] = useState(false)
-  const [projectsDialog, setProjectsDialog] = useState<{ projectId?: string } | null>(null)
-  const openProjects = useCallback((projectId?: string) => setProjectsDialog({ projectId }), [])
+  const openProjects = useCallback(
+    (projectId?: string) => openRoute('/app/projects', projectId ? { projectId } : undefined),
+    []
+  )
   const invalidateCache = useInvalidateCache()
   const closeConversationTabs = useCloseConversationTabs()
   const { setSessionWorkspace } = useUpdateSession()
@@ -1196,19 +1198,6 @@ const AgentPage = () => {
           onOpenChange={setAgentCreateOpen}
           onCreated={handleAgentConversationSelect}
         />
-        {projectsDialog && (
-          <ProjectsDialog
-            initialProjectId={projectsDialog.projectId}
-            onClose={() => setProjectsDialog(null)}
-            onStart={async (defaults) => {
-              const session = await createAndActivateEmptySession(defaults)
-              if (session) {
-                await setSessionDisplayMode('project')
-                setProjectsDialog(null)
-              }
-            }}
-          />
-        )}
       </Container>
     </>
   )

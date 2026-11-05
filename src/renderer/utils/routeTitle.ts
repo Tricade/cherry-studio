@@ -9,6 +9,7 @@ const BASE_URL = 'https://www.cherry-ai.com/'
 const routeTitleKeys: Record<string, string> = {
   '/app/chat': 'agent.session.group.conversation',
   '/app/agents': 'title.work',
+  '/app/projects': 'project.title',
   '/app/paintings': 'title.paintings',
   '/app/translate': 'title.translate',
   '/app/launchpad': 'title.launchpad',

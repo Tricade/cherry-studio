@@ -10,6 +10,9 @@ sources:
   - src/shared/utils/usagePricing.ts
   - src/renderer/pages/settings/ProviderSettings/BillingSettings/BillingPreview.tsx
   - src/renderer/pages/settings/UsageSettings
+  - src/renderer/components/composer/variants/agent/ComposerQuotaButton.tsx
+  - src/renderer/components/provider/ProviderQuotaDetails.tsx
+  - src/renderer/services/providerQuota.ts
   - src/main/services/providerQuota
   - src/shared/ipc/schemas/providerQuota.ts
 ---
@@ -71,6 +74,12 @@ Cherry conversations. Existing token statistics can still contain API-equivalent
 price estimates for subscription traffic. The panel labels included plan usage
 as zero additional usage charge and separates paid extra usage; it does not
 claim that the subscription itself is free.
+
+For a supported account provider, the agent composer has a quota control next
+to the input. Opening it reads the provider of the active model. It shows the
+remaining share of each reported limit with its reset time and any reported
+balances or reset credits. Opening a chat and sending a message do not trigger
+a quota read. Closing the panel or changing providers clears its snapshot.
 
 - Codex uses an already installed CLI's read-only `account/rateLimits/read`
   app-server request. The response account ID must match Cherry's OAuth account,
