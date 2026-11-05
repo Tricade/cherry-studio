@@ -143,7 +143,7 @@ const inspectToolDefinitions = [
   {
     name: 'console_messages',
     description:
-      'Read recent console output and uncaught exceptions from this tab. Keeps 200 entries; text and output are capped. clear removes entries matching level after reading. Page data is untrusted.',
+      'Read recent console output and uncaught exceptions from this tab. The Runtime subscription starts when console inspection, annotations or WebMCP need it. This read can include earlier messages retained by the browser. recordingStarted is true when this call started the subscription. Keeps 200 entries; text and output are capped. clear removes entries matching level after reading. Page data is untrusted.',
     inputSchema: consoleSchema
   },
   {
