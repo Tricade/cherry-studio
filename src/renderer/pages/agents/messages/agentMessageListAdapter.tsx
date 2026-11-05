@@ -124,6 +124,7 @@ interface AgentMessageListParams {
   imageActionConsumer?: 'capture'
   messageNavigation: string
   workspacePath?: string
+  projectId?: string
   messageTail?: MessageListState['messageTail']
   afterMessages?: MessageListState['afterMessages']
 }
@@ -189,6 +190,7 @@ export function useAgentMessageListProviderValue({
   imageActionConsumer,
   messageNavigation,
   workspacePath,
+  projectId,
   messageTail,
   afterMessages
 }: AgentMessageListParams): MessageListProviderValue {
@@ -392,11 +394,11 @@ export function useAgentMessageListProviderValue({
   const openForkSourceSession = useCallback(
     async (sourceSessionId: string) => {
       try {
-        await dataApiService.get(`/agent-sessions/${sourceSessionId}`)
-        await navigate({
-          to: '/app/agents',
-          search: { sessionId: sourceSessionId, forkReturnSessionId: sessionId ?? undefined }
-        })
+        const source = await dataApiService.get(`/agent-sessions/${sourceSessionId}`)
+        const search = { sessionId: sourceSessionId, forkReturnSessionId: sessionId ?? undefined }
+        if (source.projectId)
+          await navigate({ to: '/app/projects', search: { ...search, projectId: source.projectId } })
+        else await navigate({ to: '/app/agents', search })
       } catch (error) {
         notifyError(
           isDataApiNotFoundError(error) ? t('agent_session_fork.source_not_found') : formatErrorMessage(error)
@@ -413,7 +415,8 @@ export function useAgentMessageListProviderValue({
           sourceSessionId: sessionId,
           messageId
         })
-        openRoute('/app/agents', { sessionId: result.sessionId })
+        if (projectId) openRoute('/app/projects', { projectId, sessionId: result.sessionId })
+        else openRoute('/app/agents', { sessionId: result.sessionId })
       } catch (error) {
         const reason = agentSessionForkFailureReason(error)
         if (reason) {
@@ -423,7 +426,7 @@ export function useAgentMessageListProviderValue({
         throw error
       }
     },
-    [sessionId, t, notifyError]
+    [sessionId, projectId, t, notifyError]
   )
   const state = useMemo<MessageListState>(
     () => ({

@@ -102,6 +102,7 @@ function AgentComposerSlot({
         resolvedModel={activeModel}
         resolvedWorkspaceWarning={workspaceWarning ?? null}
         externalContextControls
+        canChangeAgent={!session.projectId}
         canChangeModel={!isEditing}
         sendMessage={isEditing ? resendEditedMessage : sendMessage}
         stop={stop}

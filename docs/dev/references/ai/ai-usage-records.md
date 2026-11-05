@@ -81,13 +81,11 @@ remaining share of each reported limit with its reset time and any reported
 balances or reset credits. Opening a chat and sending a message do not trigger
 a quota read. Closing the panel or changing providers clears its snapshot.
 
-- Codex uses an already installed CLI's read-only `account/rateLimits/read`
-  app-server request. The response account ID must match Cherry's OAuth account,
-  which is checked again after the request. No CLI is installed, no turn is
-  started, and reset credits are never consumed. Analytics, feedback and OTLP
-  exporters are disabled for this process. Compatibility was checked against
-  the official `rust-v0.166.0-alpha.5.1` protocol; unsupported installed versions
-  fail without inventing quotas.
+- Codex uses Cherry's existing OAuth connection. The main process reads
+  `/backend-api/wham/usage` and optional reset-credit details via fixed
+  authenticated GET requests. It checks the account before returning the
+  report. The wire fields follow the official legacy Codex client at
+  `rust-v0.166.0-alpha.5.1`.
 - Claude uses the pinned Agent SDK/native CLI `0.3.284` experimental usage
   control request with `skipBehaviors: true`, using the same CLI login profile
   as external-CLI sessions. The held empty input stream sends no inference

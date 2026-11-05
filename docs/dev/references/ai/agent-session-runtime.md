@@ -282,7 +282,7 @@ cross-Agent personal Session continues the target Agent's most recent personal w
 sender's workspace when that Agent has no Session. The model is not a tool argument because
 Sessions use their owning Agent's model.
 
-In a project, start the Session of the Agent whose configured model should coordinate the team.
+In Projects, designate a team member as coordinator and start that Agent’s Session. The role adds guidance for delegation and review to the project prompt. Each Agent’s permission mode still governs team tools.
 Use `agent_list` to discover current members and models, `session_create` to assign work, or
 `session_send` with `reply: 'completion'` to continue an existing teammate's conversation.
 In an interactive turn, the coordinator can call `session_deliveries` with its own `request_id` and `wait_for_result: true` to wait up to 20 seconds for a committed result. A timeout returns the current state. The automatic completion still appears in the caller’s history. The coordinator can inspect the returned evidence with `session_read` and request a correction

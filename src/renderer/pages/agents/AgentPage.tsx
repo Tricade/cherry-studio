@@ -1,5 +1,5 @@
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
-import type { PropsWithChildren } from 'react'
+import type { PropsWithChildren, ReactNode } from 'react'
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -48,6 +48,7 @@ import { getDefaultRouteTitle } from '@renderer/utils/routeTitle'
 import { cn } from '@renderer/utils/style'
 import { isDataApiNotFoundError } from '@shared/data/api/errors'
 import type { ConcreteApiPaths } from '@shared/data/api/paths'
+import type { AgentProjectEntity } from '@shared/data/api/schemas/agentProjects'
 import type { AgentSessionEntity } from '@shared/data/api/schemas/agentSessions'
 import { AGENT_WORKSPACE_TYPE, type AgentSessionWorkspaceSource } from '@shared/data/api/schemas/agentWorkspaces'
 import type { TopicTabPosition } from '@shared/data/preference/preferenceTypes'
@@ -64,6 +65,7 @@ import {
   type FeedbackComposerLaunch,
   getFeedbackIntentGuardCacheKey
 } from './feedbackComposerLaunch'
+import type { AgentRouteSearch } from './routeSearch'
 import {
   createSkillComposerLaunch,
   getSkillIntentGuardCacheKey,
@@ -106,13 +108,39 @@ function getWorkspaceSourceFromSession(session: AgentSessionEntity): AgentSessio
     : { type: AGENT_WORKSPACE_TYPE.SYSTEM }
 }
 
-const AgentPage = () => {
+type ProjectSidebarActions = {
+  activeSessionId?: string
+  selectSession: (session: AgentSessionEntity) => void
+  createSession: (agentId: string) => void
+  requestNavigation: (transition: () => void) => void
+}
+
+type AgentWorkspaceProps = {
+  routeSearch: AgentRouteSearch
+  projectView?: {
+    project?: AgentProjectEntity
+    onSessionChange: (sessionId?: string) => void
+    renderSidebar: (actions: ProjectSidebarActions) => ReactNode
+  }
+}
+
+const AgentPage = () => <AgentWorkspace routeSearch={agentsRouteApi.useSearch<AppRouter>()} />
+
+export function AgentWorkspace({ routeSearch, projectView }: AgentWorkspaceProps) {
   const [showSidebar, setShowSidebar] = usePreference('topic.tab.show')
   const [sessionDisplayMode, setSessionDisplayMode] = usePreference('agent.session.display_mode')
   const [panePosition, setPanePosition] = usePreference('agent.session.position')
-  const isClassicSessionLayout = sessionDisplayMode === 'agent'
-  const routeSearch = agentsRouteApi.useSearch<AppRouter>()
+  const isClassicSessionLayout = !projectView && sessionDisplayMode === 'agent'
   const navigate = useNavigate()
+  const project = projectView?.project
+  const onProjectSessionChange = projectView?.onSessionChange
+  const replaceSessionRoute = useCallback(
+    (id?: string) => {
+      if (onProjectSessionChange) onProjectSessionChange(id)
+      else void navigate({ to: '/app/agents', search: id ? { sessionId: id } : {}, replace: true })
+    },
+    [navigate, onProjectSessionChange]
+  )
   const { t } = useTranslation()
   const isFeedbackIntent = routeSearch.intent === 'feedback'
   const isSkillIntent = routeSearch.intent === 'skill'
@@ -162,11 +190,9 @@ const AgentPage = () => {
     (id: string | null) => {
       ownerFallbackRequestIdRef.current += 1
       setActiveSessionIdState(id)
-      if (id) {
-        void navigate({ to: '/app/agents', search: { sessionId: id }, replace: true })
-      }
+      if (id) replaceSessionRoute(id)
     },
-    [navigate]
+    [replaceSessionRoute]
   )
   const [sessionPaneOpen, setSessionPaneOpen] = useClassicLayoutRightPaneOpen('agent', {
     enabled: isClassicSessionLayout,
@@ -240,18 +266,25 @@ const AgentPage = () => {
   const closeConversationTabs = useCloseConversationTabs()
   const { setSessionWorkspace } = useUpdateSession()
   useEffect(() => {
-    if (activeSessionId || agents.length > 0 || isAgentsLoading || isPreparedIntent || missingAgentSelection) {
+    if (
+      projectView ||
+      activeSessionId ||
+      agents.length > 0 ||
+      isAgentsLoading ||
+      isPreparedIntent ||
+      missingAgentSelection
+    ) {
       return
     }
 
     setMissingAgentSelection(true)
-  }, [activeSessionId, agents.length, isAgentsLoading, isPreparedIntent, missingAgentSelection])
+  }, [activeSessionId, agents.length, isAgentsLoading, isPreparedIntent, missingAgentSelection, projectView])
   const initialActiveSession = useMemo(
     () => (activeSessionId ? agentSessions.find((session) => session.id === activeSessionId) : undefined),
     [activeSessionId, agentSessions]
   )
   const {
-    session: activeSession,
+    session: resolvedActiveSession,
     isLoading: isActiveSessionLoading,
     error: activeSessionError,
     sessionSource: activeSessionSource,
@@ -264,6 +297,17 @@ const AgentPage = () => {
     setActiveSessionId,
     initialSession: initialActiveSession
   })
+  const belongsToProject = useCallback(
+    (session: AgentSessionEntity) =>
+      !projectView ||
+      (project !== undefined &&
+        session.projectId === project.id &&
+        session.workspaceId === project.workspaceId &&
+        !!session.agentId &&
+        project.agentIds.includes(session.agentId)),
+    [project, projectView]
+  )
+  const activeSession = resolvedActiveSession && belongsToProject(resolvedActiveSession) ? resolvedActiveSession : null
   useEffect(() => {
     if (!forkReturnSessionId || !routeSessionId || activeSessionId !== routeSessionId) return
     let cancelled = false
@@ -272,29 +316,33 @@ const AgentPage = () => {
       revalidate: false
     }).then(
       () => {
-        if (!cancelled) void navigate({ to: '/app/agents', search: { sessionId: routeSessionId }, replace: true })
+        if (!cancelled) replaceSessionRoute(routeSessionId)
       },
       (error) => {
         if (cancelled) return
         toast.error(
           isDataApiNotFoundError(error) ? t('agent_session_fork.source_not_found') : formatErrorMessage(error)
         )
-        void navigate({ to: '/app/agents', search: { sessionId: forkReturnSessionId }, replace: true })
+        replaceSessionRoute(forkReturnSessionId)
       }
     )
     return () => {
       cancelled = true
     }
-  }, [activeSessionId, forkReturnSessionId, navigate, refreshActiveSession, routeSessionId, t])
+  }, [activeSessionId, forkReturnSessionId, refreshActiveSession, replaceSessionRoute, routeSessionId, t])
   const reenterAgentRoute = useCallback(() => {
     // The bound session is gone. Drop the remembered id too: `ui.agent.last_used_session_id`
     // is never cleared on delete, so without this the bare re-entry re-reads the stale id in
     // `resolveAgentEntrySessionId`, 404s, and the NOT_FOUND recovery fires again — a navigate
     // loop React aborts as a maximum-update-depth render error that tears down the window.
-    cacheService.setPersist('ui.agent.last_used_session_id', null)
+    if (!onProjectSessionChange) cacheService.setPersist('ui.agent.last_used_session_id', null)
     clearActiveSession()
-    void navigate({ to: '/app/agents', search: {}, replace: true })
-  }, [clearActiveSession, navigate])
+    replaceSessionRoute()
+  }, [clearActiveSession, onProjectSessionChange, replaceSessionRoute])
+  useEffect(() => {
+    if (activeSessionId === routeSessionId && resolvedActiveSession && !belongsToProject(resolvedActiveSession))
+      reenterAgentRoute()
+  }, [activeSessionId, belongsToProject, reenterAgentRoute, resolvedActiveSession, routeSessionId])
   // The URL-bound session no longer exists: its by-id query settled with NOT_FOUND (deleted while
   // this tab was dormant, or a rotted deep link). Recovery is a plain replace-navigation back
   // through the entry interceptor, which resolves the next target — no in-page state surgery.
@@ -317,7 +365,9 @@ const AgentPage = () => {
   const lastVisibleSessionRef = useRef<AgentSessionEntity | null>(null)
   const visibleSession =
     activeSession ??
-    (isActiveSessionLoading && lastVisibleSessionRef.current?.id === activeSessionId
+    (isActiveSessionLoading &&
+    lastVisibleSessionRef.current?.id === activeSessionId &&
+    belongsToProject(lastVisibleSessionRef.current)
       ? lastVisibleSessionRef.current
       : null)
   const visibleAgentFromList = agents.find((agent) => agent.id === visibleSession?.agentId)
@@ -477,9 +527,13 @@ const AgentPage = () => {
 
   const resolveEmptySession = useCallback(
     async (agentId: string, defaults: CreateAgentSessionDefaults = {}): Promise<AgentSessionEntity> => {
-      const workspaceSource = await resolveCreateWorkspaceSource(defaults, visibleSession)
+      const workspaceSource = project
+        ? { type: AGENT_WORKSPACE_TYPE.USER, workspaceId: project.workspaceId }
+        : await resolveCreateWorkspaceSource(defaults, visibleSession)
       const projectId =
-        defaults.projectId ?? (Object.keys(defaults).length === 0 ? visibleSession?.projectId : undefined)
+        project?.id ??
+        defaults.projectId ??
+        (Object.keys(defaults).length === 0 ? visibleSession?.projectId : undefined)
       if (projectId) {
         const session = await dataApiService.post('/agent-sessions', {
           body: { agentId, projectId, name: '', workspace: workspaceSource }
@@ -503,13 +557,21 @@ const AgentPage = () => {
 
       return result.session
     },
-    [closeConversationTabs, invalidateCache, resolveCreateWorkspaceSource, reuseOrCreateSession, visibleSession]
+    [
+      closeConversationTabs,
+      invalidateCache,
+      project,
+      resolveCreateWorkspaceSource,
+      reuseOrCreateSession,
+      visibleSession
+    ]
   )
 
   const createAndActivateEmptySession = useCallback(
     async (defaults: CreateAgentSessionDefaults = {}): Promise<AgentSessionEntity | null> => {
       if (isCreatingEmptySessionRef.current) return null
       isCreatingEmptySessionRef.current = true
+      const requestId = ownerFallbackRequestIdRef.current
       // A sidebar `?agentId=` entry whose agent has no sessions yet falls through to the page;
       // create for that exact agent rather than whatever session happens to be visible.
       const agentId =
@@ -526,6 +588,7 @@ const AgentPage = () => {
         }
 
         const session = await resolveEmptySession(agentId, defaults)
+        if (projectView && requestId !== ownerFallbackRequestIdRef.current) return null
         activateSession(session, agentId)
         return session
       } catch (err) {
@@ -541,6 +604,7 @@ const AgentPage = () => {
       clearActiveSession,
       clearLocate,
       closeSurface,
+      projectView,
       resolveEmptySession,
       routeAgentId,
       t,
@@ -680,6 +744,7 @@ const AgentPage = () => {
 
   const handleHistorySessionSelect = useCallback(
     (sessionId: string, messageId?: string) => {
+      if (projectView && !agentSessions.some((session) => session.id === sessionId && belongsToProject(session))) return
       const transition = () => {
         closeSurface()
         setShellPaneOpen(true)
@@ -706,8 +771,11 @@ const AgentPage = () => {
       requestSessionNavigation(sessionId, transition)
     },
     [
+      agentSessions,
+      belongsToProject,
       clearLocate,
       closeSurface,
+      projectView,
       requestSessionNavigation,
       requestLocate,
       selectSession,
@@ -1027,53 +1095,62 @@ const AgentPage = () => {
       visibleSession?.agentId
     ]
   )
-  const pane =
-    isClassicSessionLayout && sessionListPosition === 'right' ? (
-      <AgentResourceList
-        activeAgentId={activeResourceAgentId}
-        activeSessionId={visibleSession?.id ?? null}
-        dataEnabled={shellPaneOpen}
-        agentSessionsSource={agentSessionsSource}
-        onAddAgent={() => {
-          setAgentCreateOpen(true)
-        }}
-        historyRecordsActive={historyRecordsActive}
-        onOpenHistoryRecords={isWindowFrame ? undefined : openHistoryRecords}
-        onSelectSession={handleResourceSessionSelect}
-        onSelectedAgentClick={() => {
-          closeSurface()
-          if (!sessionPaneOpen) setSessionPaneUserOpenIntentSeq((seq) => seq + 1)
-          setSessionPaneOpen(!sessionPaneOpen)
-        }}
-        onCreateSession={handleCreateSessionForAgent}
-        onShowMissingAgentSelection={showMissingAgentSelection}
-        manageAgentsActive={manageAgentsActive}
-        onManageAgents={onManageAgents}
-        onManageProjects={openProjects}
-        onActiveAgentDeleted={handleActiveAgentDeleted}
-      />
-    ) : (
-      <AgentSidePanel
-        activeSessionId={activeSessionId}
-        dataEnabled={shellPaneOpen}
-        agentSessionsSource={agentSessionsSource}
-        onActiveAgentDeleted={handleActiveAgentDeleted}
-        onAddAgent={() => {
-          setAgentCreateOpen(true)
-        }}
-        historyRecordsActive={historyRecordsActive}
-        revealRequest={sessionRevealRequest}
-        onOpenHistoryRecords={isWindowFrame ? undefined : openHistoryRecords}
-        onCreateSession={createAndActivateEmptySession}
-        onShowMissingAgentSelection={showMissingAgentSelection}
-        onSetPanePosition={isWindowFrame ? undefined : setSessionListPosition}
-        panePosition="left"
-        manageAgentsActive={manageAgentsActive}
-        onManageAgents={onManageAgents}
-        onManageProjects={openProjects}
-        setActiveSessionId={setActiveSessionAndClearTransient}
-      />
-    )
+  const pane = projectView ? (
+    projectView.renderSidebar({
+      activeSessionId: visibleSession?.id,
+      selectSession: (session) => {
+        if (belongsToProject(session))
+          requestSessionNavigation(session.id, () => handleResourceSessionSelect(session.id, session))
+      },
+      createSession: (agentId) => void createAndActivateEmptySession({ agentId }),
+      requestNavigation: requestFileNavigation
+    })
+  ) : isClassicSessionLayout && sessionListPosition === 'right' ? (
+    <AgentResourceList
+      activeAgentId={activeResourceAgentId}
+      activeSessionId={visibleSession?.id ?? null}
+      dataEnabled={shellPaneOpen}
+      agentSessionsSource={agentSessionsSource}
+      onAddAgent={() => {
+        setAgentCreateOpen(true)
+      }}
+      historyRecordsActive={historyRecordsActive}
+      onOpenHistoryRecords={isWindowFrame ? undefined : openHistoryRecords}
+      onSelectSession={handleResourceSessionSelect}
+      onSelectedAgentClick={() => {
+        closeSurface()
+        if (!sessionPaneOpen) setSessionPaneUserOpenIntentSeq((seq) => seq + 1)
+        setSessionPaneOpen(!sessionPaneOpen)
+      }}
+      onCreateSession={handleCreateSessionForAgent}
+      onShowMissingAgentSelection={showMissingAgentSelection}
+      manageAgentsActive={manageAgentsActive}
+      onManageAgents={onManageAgents}
+      onManageProjects={openProjects}
+      onActiveAgentDeleted={handleActiveAgentDeleted}
+    />
+  ) : (
+    <AgentSidePanel
+      activeSessionId={activeSessionId}
+      dataEnabled={shellPaneOpen}
+      agentSessionsSource={agentSessionsSource}
+      onActiveAgentDeleted={handleActiveAgentDeleted}
+      onAddAgent={() => {
+        setAgentCreateOpen(true)
+      }}
+      historyRecordsActive={historyRecordsActive}
+      revealRequest={sessionRevealRequest}
+      onOpenHistoryRecords={isWindowFrame ? undefined : openHistoryRecords}
+      onCreateSession={createAndActivateEmptySession}
+      onShowMissingAgentSelection={showMissingAgentSelection}
+      onSetPanePosition={isWindowFrame ? undefined : setSessionListPosition}
+      panePosition="left"
+      manageAgentsActive={manageAgentsActive}
+      onManageAgents={onManageAgents}
+      onManageProjects={openProjects}
+      setActiveSessionId={setActiveSessionAndClearTransient}
+    />
+  )
   // In classic layout the session list moves into AgentChat's stable right-pane capability catalog.
   // The config stays mounted while AgentChat swaps its conversation and center-surface content.
   const resourcePane: ResourcePaneConfig | null =
@@ -1150,7 +1227,12 @@ const AgentPage = () => {
   return (
     <>
       <AgentTabRuntime
-        title={visibleSession?.name?.trim() || visibleAgent?.name?.trim() || getDefaultRouteTitle('/app/agents')}
+        title={
+          projectView
+            ? (project?.name ?? getDefaultRouteTitle('/app/projects'))
+            : visibleSession?.name?.trim() || visibleAgent?.name?.trim() || getDefaultRouteTitle('/app/agents')
+        }
+        routePrefix={projectView ? '/app/projects' : '/app/agents'}
         emoji={agentAvatarIsEmoji ? agentAvatar : undefined}
         icon={agentAvatarIsEmoji ? undefined : agentAvatar}
         preserveVisuals={preserveTabVisuals}
@@ -1174,7 +1256,8 @@ const AgentPage = () => {
             showResourceListControls
             sidebarOpen={shellPaneOpen}
             onSidebarToggle={toggleShellPane}
-            missingAgentSelection={missingAgentSelection && !visibleSession}
+            emptyLabel={projectView ? t('project.choose_conversation') : undefined}
+            missingAgentSelection={!projectView && missingAgentSelection && !visibleSession}
             onCreateEmptySession={createAndActivateEmptySession}
             onMissingAgentSelectionAgentChange={handleMissingAgentSelectionAgentChange}
             onSessionWorkspaceChange={replaceSessionWorkspace}

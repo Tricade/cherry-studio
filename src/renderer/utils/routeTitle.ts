@@ -96,7 +96,7 @@ export function isTopLevelRoute(url: string): boolean {
 }
 
 /** Routes whose tab title + icon are owned by the page (topic / session name + emoji). */
-const PAGE_TITLED_ROUTE_BASE_PATHS = new Set(['/app/chat', '/app/agents'])
+const PAGE_TITLED_ROUTE_BASE_PATHS = new Set(['/app/chat', '/app/agents', '/app/projects'])
 
 export function isPageTitledRoute(url: string): boolean {
   const pathname = new URL(url, BASE_URL).pathname

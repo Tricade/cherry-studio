@@ -15,7 +15,7 @@ vi.mock('@renderer/ipc', () => ({ ipcApi: { request } }))
 const report: AvailableProviderQuota = {
   status: 'available',
   providerId: 'openai-codex',
-  source: 'codex-cli',
+  source: 'codex-oauth',
   accountLabel: 'test account',
   plan: null,
   fetchedAt: '2030-06-13T12:00:00Z',

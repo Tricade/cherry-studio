@@ -1,21 +1,28 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useCallback } from 'react'
 
-import { ProjectsPage } from '@renderer/pages/projects/ProjectsPage'
+import { type ProjectRouteSearch, ProjectsPage } from '@renderer/pages/agents/projects/ProjectsPage'
+
+function optionalId(value: unknown): string | undefined {
+  return typeof value === 'string' ? value.trim() || undefined : undefined
+}
 
 export const Route = createFileRoute('/app/projects')({
-  validateSearch: (search: Record<string, unknown>): { projectId?: string } =>
-    typeof search.projectId === 'string' && search.projectId.trim() ? { projectId: search.projectId.trim() } : {},
+  validateSearch: (search: Record<string, unknown>): ProjectRouteSearch => ({
+    projectId: optionalId(search.projectId),
+    sessionId: optionalId(search.sessionId),
+    forkReturnSessionId: optionalId(search.forkReturnSessionId)
+  }),
   component: ProjectsRoute
 })
 
 function ProjectsRoute() {
-  const { projectId } = Route.useSearch()
+  const search = Route.useSearch()
   const navigate = Route.useNavigate()
-  const handleProjectIdChange = useCallback(
-    (id?: string) => void navigate({ search: id ? { projectId: id } : {}, replace: true }),
+  const onSelectionChange = useCallback(
+    (selection: ProjectRouteSearch) => void navigate({ search: selection, replace: true }),
     [navigate]
   )
 
-  return <ProjectsPage projectId={projectId} onProjectIdChange={handleProjectIdChange} />
+  return <ProjectsPage {...search} onSelectionChange={onSelectionChange} />
 }

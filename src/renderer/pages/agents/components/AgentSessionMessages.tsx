@@ -166,6 +166,7 @@ const AgentSessionMessages = ({
     respondToolApproval,
     messageNavigation,
     workspacePath: workspacePath ?? session?.workspace?.path,
+    projectId: session?.projectId,
     messageTail,
     afterMessages
   })

@@ -4,34 +4,35 @@ import { normalizeClaudeQuota, normalizeCodexQuota } from '../normalizeQuota'
 
 describe('provider quota normalization', () => {
   it('preserves distinct shared/model windows, credits, resets and backend blocking without inventing token counts', () => {
-    const shared = {
-      limitId: 'codex',
-      limitName: 'Codex',
-      planType: 'plus',
-      primary: { usedPercent: 12, windowDurationMins: 300, resetsAt: 1_800_000_000 },
-      secondary: { usedPercent: 42, windowDurationMins: 10080, resetsAt: null },
-      credits: { balance: '17.25', hasCredits: true, unlimited: false },
-      individualLimit: { limit: '100', used: '8', remainingPercent: 92, resetsAt: 1_800_000_000 }
-    }
     const report = normalizeCodexQuota(
       {
-        accountId: 'account-a',
-        ordinaryUsageAllowed: false,
-        rateLimits: shared,
-        rateLimitsByLimitId: {
-          codex: shared,
-          model_bucket: { normalModelSlug: 'reported-model', primary: { usedPercent: 7, windowDurationMins: 300 } }
+        account_id: 'account-a',
+        plan_type: 'plus',
+        rate_limit: {
+          allowed: false,
+          primary_window: { used_percent: 12, limit_window_seconds: 18000, reset_at: 1_800_000_000 },
+          secondary_window: { used_percent: 42, limit_window_seconds: 604800, reset_at: null }
         },
-        rateLimitResetCredits: {
-          availableCount: 3,
+        additional_rate_limits: [
+          {
+            metered_feature: 'model_bucket',
+            normal_model_slug: 'reported-model',
+            rate_limit: { primary_window: { used_percent: 7, limit_window_seconds: 18000 } }
+          }
+        ],
+        credits: { balance: '17.25', has_credits: true, unlimited: false },
+        spend_control: {
+          individual_limit: { limit: '100', used: '8', remaining_percent: 92, reset_at: 1_800_000_000 }
+        },
+        rate_limit_reset_credits: {
+          available_count: 3,
           credits: [
             {
               id: 'voucher-1',
               title: 'Courtesy reset',
               description: 'Provider description',
               status: 'available',
-              grantedAt: 1_700_000_000,
-              expiresAt: 1_800_000_000
+              expires_at: '2027-01-15T09:00:00+01:00'
             }
           ]
         },
@@ -57,23 +58,26 @@ describe('provider quota normalization', () => {
     expect(JSON.stringify(report)).not.toMatch(/must-not-leave-main|totalTokens|inputTokens/)
   })
 
-  it.each([
-    ['different-account', 'account-mismatch'],
-    [null, 'no-data']
-  ])('withholds the complete report for an unverified account (%s)', (accountId, reason) => {
-    expect(normalizeCodexQuota({ accountId, rateLimits: { primary: { usedPercent: 98 } } }, 'account-a')).toEqual({
+  it('rejects a mismatched account and accepts older payloads without an account id', () => {
+    const rate_limit = { primary_window: { used_percent: 98 } }
+    expect(normalizeCodexQuota({ account_id: 'other', rate_limit }, 'account-a')).toEqual({
       providerId: 'openai-codex',
       status: 'unavailable',
-      reason
+      reason: 'account-mismatch'
+    })
+    expect(normalizeCodexQuota({ rate_limit }, 'account-a')).toMatchObject({
+      status: 'available',
+      accountLabel: 'account-a',
+      windows: [{ usedPercent: 98 }]
     })
   })
 
   it('keeps unknown utilization and reset-credit details distinct from zero', () => {
     const result = normalizeCodexQuota(
       {
-        accountId: 'account-a',
-        rateLimits: { primary: {} },
-        rateLimitResetCredits: { availableCount: 2, credits: null }
+        account_id: 'account-a',
+        rate_limit: { primary_window: {} },
+        rate_limit_reset_credits: { available_count: 2, credits: null }
       },
       'account-a'
     )
@@ -129,7 +133,10 @@ describe('provider quota normalization', () => {
       normalizeClaudeQuota({ rate_limits_available: true, rate_limits: { five_hour: { utilization: -1 } } }, 'CLI')
     ).toThrow()
     expect(() =>
-      normalizeCodexQuota({ accountId: 'account-a', rateLimits: { primary: { usedPercent: '12%' } } }, 'account-a')
+      normalizeCodexQuota(
+        { account_id: 'account-a', rate_limit: { primary_window: { used_percent: '12%' } } },
+        'account-a'
+      )
     ).toThrow()
   })
 })

@@ -15,7 +15,7 @@ const provider = { id: 'openai-codex', name: 'Codex', isEnabled: true, authMetho
 const snapshot: AvailableProviderQuota = {
   status: 'available',
   providerId: provider.id,
-  source: 'codex-cli',
+  source: 'codex-oauth',
   accountLabel: 'test-account',
   plan: 'plus',
   fetchedAt: '2026-11-02T12:00:00.000Z',

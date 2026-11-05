@@ -4,7 +4,7 @@ import { CircularProgress } from '@cherrystudio/ui'
 import type { ProviderQuotaReport } from '@shared/ipc/schemas/providerQuota'
 
 const sourceKeys = {
-  'codex-cli': 'settings.usage.quota.source.codex-cli',
+  'codex-oauth': 'settings.usage.quota.source.codex-oauth',
   'claude-cli': 'settings.usage.quota.source.claude-cli',
   'cherryin-oauth': 'settings.usage.quota.source.cherryin-oauth'
 } as const
