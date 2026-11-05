@@ -3,7 +3,7 @@ import type { FC, ReactNode, Ref } from 'react'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { Button, InfoTooltip, PageSidePanel, Tooltip } from '@cherrystudio/ui'
+import { Button, InfoTooltip, PageSidePanel, Switch, Tooltip } from '@cherrystudio/ui'
 import { usePreference } from '@data/hooks/usePreference'
 import { loggerService } from '@logger'
 import { DefaultModelSelector } from '@renderer/components/DefaultModelSelector'
@@ -25,6 +25,7 @@ import { toast } from '@renderer/services/toast'
 import { scrollIntoView } from '@renderer/utils/dom'
 import { cn } from '@renderer/utils/style'
 import { TRANSLATE_PROMPT } from '@shared/ai/prompts'
+import { CHERRYAI_API_BASE_URL } from '@shared/data/presets/cherryai'
 import type { Model } from '@shared/data/types/model'
 import { isGenerateImageModel, isNonChatModel } from '@shared/utils/model'
 
@@ -153,6 +154,7 @@ const ModelSettings: FC<ModelSettingsProps> = ({
   const { setTimeoutTimer } = useTimer()
 
   const [translateModelPrompt, setTranslateModelPrompt] = usePreference('feature.translate.model_prompt')
+  const [allowCherryAiGuest, setAllowCherryAiGuest] = usePreference('feature.cherryai_guest.enabled')
 
   const chatModelFilter = useCallback(
     (model: Model) => !isNonChatModel(model) && (modelFilter?.(model) ?? true),
@@ -348,6 +350,24 @@ const ModelSettings: FC<ModelSettingsProps> = ({
                   placeholder={t('settings.models.empty')}
                 />
               </ModelSettingRow>
+            </>
+          )}
+          {!compact && (
+            <>
+              <SettingDivider />
+              <div className="space-y-1.5">
+                <SettingRow id="setting-model-cherryai-guest">
+                  <SettingRowTitle>{t('settings.models.cherryai_guest.label')}</SettingRowTitle>
+                  <Switch
+                    aria-label={t('settings.models.cherryai_guest.label')}
+                    checked={allowCherryAiGuest}
+                    onCheckedChange={setAllowCherryAiGuest}
+                  />
+                </SettingRow>
+                <SettingDescription>
+                  {t('settings.models.cherryai_guest.description', { destination: CHERRYAI_API_BASE_URL })}
+                </SettingDescription>
+              </div>
             </>
           )}
         </SettingGroup>

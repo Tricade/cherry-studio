@@ -36,6 +36,7 @@ export class CherryAssistantSeeder implements ISeeder {
 
   run(db: DbType): void {
     db.transaction((tx) => {
+      if (agentService.wasBuiltinAgentRemovedTx(tx, 'assistant')) return
       const existing = agentService.findBuiltinAgentByRoleTx(tx, 'assistant', { includeDeleted: true })
       if (existing) return
 

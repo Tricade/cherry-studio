@@ -32,6 +32,7 @@ export class CherrySupportSeeder implements ISeeder {
   run(db: DbType): void {
     db.transaction((tx) => {
       agentService.clearUntrustedBuiltinSupportRolesTx(tx)
+      if (agentService.wasBuiltinAgentRemovedTx(tx, BUILTIN_AGENT_ROLE.SUPPORT)) return
       agentService.claimBuiltinSupportIdentityTx(tx)
       const existing = agentService.findBuiltinAgentByRoleTx(tx, BUILTIN_AGENT_ROLE.SUPPORT, {
         includeDeleted: true

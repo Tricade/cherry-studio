@@ -10,6 +10,7 @@ import { application } from '@application'
 import { formatPrivateKey, hasProviderConfig, type StringKeys } from '@cherrystudio/ai-core/provider'
 import type { CherryInProviderSettings } from '@cherrystudio/ai-sdk-provider'
 import { providerService, type ResolvedProviderApiKey } from '@main/data/services/ProviderService'
+import { t } from '@main/i18n'
 import { copilotService } from '@main/services/CopilotService'
 import { mergeHeaders } from '@main/utils/http'
 import { CHERRYAI_PROVIDER_ID, isManagedCherryCloudModel } from '@shared/data/presets/cherryai'
@@ -584,6 +585,9 @@ async function buildCherryAIConfig(ctx: BuilderContext): Promise<ProviderConfig<
       includeUsage: resolveEndpointDialect(ctx.actualProvider, ctx.endpointType).streamOptions,
       headers: { ...getProviderAppHeaders(ctx.actualProvider), ...getExtraHeaders(ctx.actualProvider) },
       fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (application.get('PreferenceService').get('feature.cherryai_guest.enabled') !== true) {
+          throw new Error(t('settings.models.cherryai_guest.disabled'))
+        }
         const signature = generateSignature({
           method: 'POST',
           path: '/chat/completions',

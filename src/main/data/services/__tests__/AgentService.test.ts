@@ -471,7 +471,7 @@ describe('AgentService', () => {
       expect(agentService.listAgents().agents.map((agent) => agent.id)).toEqual([ordinary.id, builtin.id])
     })
 
-    it('restores exactly one active assistant after the previous row was soft-deleted', () => {
+    it('requires an explicit restore for a legacy archived assistant', () => {
       const first = agentService.ensureBuiltinAgent(defaults)
       dbh.db
         .update(agentTable)
@@ -479,31 +479,24 @@ describe('AgentService', () => {
         .where(eq(agentTable.id, first.id))
         .run()
 
-      const restored = agentService.ensureBuiltinAgent(defaults)
-      const repeated = agentService.ensureBuiltinAgent(defaults)
-
-      expect(restored.id).not.toBe(first.id)
-      expect(repeated.id).toBe(restored.id)
-      expect(builtinRows()).toHaveLength(2)
-      expect(activeBuiltinRows()).toHaveLength(1)
+      expect(() => agentService.ensureBuiltinAgent(defaults)).toThrow(/deleted/i)
+      expect(activeBuiltinRows()).toHaveLength(0)
+      expect(builtinRows()).toHaveLength(1)
+      expect(agentService.restoreAgent(first.id).id).toBe(first.id)
+      expect(agentService.ensureBuiltinAgent(defaults).id).toBe(first.id)
     })
 
-    it('restores the assistant after the Agent delete endpoint removed its row', () => {
+    it('does not recreate a built-in assistant deleted permanently from the active library', () => {
       const first = agentService.ensureBuiltinAgent(defaults)
-
-      expect(agentService.deleteAgent(first.id, { deleteSessions: true })).toMatchObject({ deleted: true })
-
-      const restored = agentService.ensureBuiltinAgent(defaults)
-
-      expect(restored.id).not.toBe(first.id)
-      expect(agentService.getAgent(first.id)).toBeNull()
-      expect(activeBuiltinRows()).toHaveLength(1)
+      const impact = dbh.db.transaction((tx) =>
+        agentService.deleteAgentStateTx(tx, first.id, { permanent: true, targetState: 'active' })
+      )
+      expect(impact.deleted).toBe(true)
+      expect(builtinRows()).toHaveLength(0)
+      expect(() => agentService.ensureBuiltinAgent(defaults)).toThrow(/deleted/i)
     })
 
-    it('re-fires onAgentCreated when a soft-deleted Support agent is restored in place', () => {
-      // The claim path restores the reserved support row WITHOUT creating a
-      // new one (created: false) — post-commit provisioning subscribers (the
-      // heartbeat schedule sync) must still hear about it.
+    it('requires an explicit restore for a legacy archived support agent', () => {
       const supportDefaults: Parameters<typeof agentService.ensureBuiltinAgent>[0] = {
         ...defaults,
         builtinRole: 'support',
@@ -516,19 +509,10 @@ describe('AgentService', () => {
         .where(eq(agentTable.id, first.id))
         .run()
 
-      const events: string[] = []
-      const disposable = agentService.onAgentCreated(({ agentId }) => events.push(agentId))
-      try {
-        const restored = agentService.ensureBuiltinAgent(supportDefaults)
-        // Restored in place under the reserved identity — not a fresh row.
-        expect(restored.id).toBe(first.id)
-        // An active repeat fires nothing.
-        agentService.ensureBuiltinAgent(supportDefaults)
-      } finally {
-        disposable.dispose()
-      }
-
-      expect(events).toEqual([first.id])
+      expect(() => agentService.ensureBuiltinAgent(supportDefaults)).toThrow(/deleted/i)
+      expect(agentService.getAgent(first.id)).toBeNull()
+      expect(agentService.restoreAgent(first.id).id).toBe(first.id)
+      expect(agentService.ensureBuiltinAgent(supportDefaults).id).toBe(first.id)
     })
 
     it('leaves the model unset when the default cannot run the Agent runtime', () => {

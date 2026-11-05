@@ -54,6 +54,10 @@ To maximize the protection of your privacy and information security, we explicit
 
 ## IV. Built-in Model Services
 
+**Tricade fork:** The CherryAI guest model is off by default. You can allow it under **Settings → Default Model**. Features using that model send their inputs and context to `https://api.cherry-ai.com` without a personal Cherry account. This setting applies to guest inference, separately from signed-in Cherry Cloud and confirmed diagnostic uploads.
+
+Automatic conversation titles never use the guest model. The first-message title is created locally. If automatic summaries are enabled, the first exchange can be sent to the configured Quick Model or default model; without an eligible model, the local title is kept.
+
 Cherry Studio provides Built-in Model Services that require no API Key configuration on your part. When you use these services, the prompts, conversation context, and model responses necessary to complete inference are relayed through Cherry Studio's official service.
 
 The relay service processes only the current request. It does not log or store the relevant content, discards it immediately upon completion of the request, and does not use it for any purpose beyond that request.

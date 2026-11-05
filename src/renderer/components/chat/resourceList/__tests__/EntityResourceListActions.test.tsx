@@ -529,8 +529,7 @@ describe('classic layout entity resource list actions', () => {
     assistantDataMocks.refetchAssistants.mockClear()
     agentDataMocks.deleteAgent.mockResolvedValue({ deleted: true, deletedSessionIds: [] })
     agentDataMocks.deleteAgent.mockClear()
-    agentDataMocks.deleteAgentSessions.mockResolvedValue({ deletedIds: [] })
-    agentDataMocks.deleteAgentSessions.mockClear()
+    agentDataMocks.deleteAgentSessions.mockReset().mockResolvedValue({ deletedIds: [] })
     agentDataMocks.invalidate.mockResolvedValue(undefined)
     agentDataMocks.invalidate.mockClear()
     agentDataMocks.ipcRequest.mockImplementation((route, input) =>
@@ -1297,7 +1296,8 @@ describe('classic layout entity resource list actions', () => {
     expect(agentDataMocks.refetchAgents).not.toHaveBeenCalled()
   })
 
-  it('uses delete-agent actions for the classic layout agent context and more menus', async () => {
+  it.each([undefined, 'assistant', 'support'] as const)('archives %s agents from classic menus', async (role) => {
+    if (role) agentDataMocks.agents[0].configuration = { builtin_role: role }
     const onShowMissingAgentSelection = vi.fn()
     const onActiveAgentDeleted = vi.fn()
 
@@ -1429,13 +1429,13 @@ describe('classic layout entity resource list actions', () => {
     expect(agentDataMocks.getActiveResource).toHaveBeenCalledWith('/agents/agent-1')
   })
 
-  it('deletes only sessions for the built-in Cherry Assistant in the classic layout', async () => {
+  it('deletes only sessions for the protected Doctor in the classic layout', async () => {
     agentDataMocks.agents = [
       {
         id: 'agent-1',
-        name: 'Cherry Assistant',
+        name: 'Cherry Doctor',
         orderKey: 'a',
-        configuration: { builtin_role: 'assistant' },
+        configuration: { builtin_role: 'doctor' },
         model: 'anthropic::claude-sonnet-4',
         modelName: 'Claude Sonnet 4'
       }
@@ -1466,7 +1466,7 @@ describe('classic layout entity resource list actions', () => {
     expect(popup.confirm).not.toHaveBeenCalled()
     expect(conversationOwnerPopupMocks.show).not.toHaveBeenCalled()
     expect(archiveSessionsPopupMocks.show).toHaveBeenCalledWith(
-      expect.objectContaining({ agentName: 'Cherry Assistant', sessionCount: 1 })
+      expect.objectContaining({ agentName: 'Cherry Doctor', sessionCount: 1 })
     )
     expect(agentDataMocks.deleteAgent).not.toHaveBeenCalled()
     expect(tabsContextMocks.closeConversationTabs).toHaveBeenCalledWith('agents', ['session-1', 'session-not-loaded'])
@@ -1488,9 +1488,9 @@ describe('classic layout entity resource list actions', () => {
     agentDataMocks.agents = [
       {
         id: 'agent-1',
-        name: 'Cherry Assistant',
+        name: 'Cherry Doctor',
         orderKey: 'a',
-        configuration: { builtin_role: 'assistant' },
+        configuration: { builtin_role: 'doctor' },
         model: 'anthropic::claude-sonnet-4',
         modelName: 'Claude Sonnet 4'
       }

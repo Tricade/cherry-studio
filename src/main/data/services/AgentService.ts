@@ -6,6 +6,7 @@ import { notifyDataApiDataChange } from '@data/dataApiDataChange'
 import { type AgentRow, agentTable as agentsTable, type InsertAgentRow } from '@data/db/schemas/agent'
 import { agentChannelTable } from '@data/db/schemas/agentChannel'
 import { agentSessionTable } from '@data/db/schemas/agentSession'
+import { appStateTable } from '@data/db/schemas/appState'
 import { agentKnowledgeBaseTable, agentMcpServerTable } from '@data/db/schemas/assistantRelations'
 import { knowledgeBaseTable } from '@data/db/schemas/knowledge'
 import { pinTable } from '@data/db/schemas/pin'
@@ -125,6 +126,19 @@ function getBuiltinRole(configuration: unknown): unknown {
   if (!configuration || typeof configuration !== 'object') return undefined
   return (configuration as { builtin_role?: unknown }).builtin_role
 }
+
+function removableBuiltinRole(id: string, configuration: unknown) {
+  const role = getBuiltinRole(configuration)
+  if (
+    role === BUILTIN_AGENT_ROLE.ASSISTANT ||
+    (role === BUILTIN_AGENT_ROLE.SUPPORT && id === CHERRY_SUPPORT_AGENT_ID)
+  ) {
+    return role
+  }
+  return undefined
+}
+
+const builtinAgentRemovalKey = (role: BuiltinAgentRole) => `builtinAgent:removed:${role}`
 
 function removeUntrustedSupportRole(id: string, configuration: unknown): Record<string, unknown> {
   const next =
@@ -425,6 +439,23 @@ export class AgentService {
     return agent ?? null
   }
 
+  wasBuiltinAgentRemovedTx(tx: DbOrTx, role: BuiltinAgentRole): boolean {
+    return !!tx
+      .select({ key: appStateTable.key })
+      .from(appStateTable)
+      .where(eq(appStateTable.key, builtinAgentRemovalKey(role)))
+      .get()
+  }
+
+  private rememberBuiltinAgentRemovalTx(tx: DbOrTx, id: string, configuration: unknown): void {
+    const role = removableBuiltinRole(id, configuration)
+    if (role)
+      tx.insert(appStateTable)
+        .values({ key: builtinAgentRemovalKey(role), value: true })
+        .onConflictDoNothing()
+        .run()
+  }
+
   /** Remove legacy Support markers from non-system IDs without changing other Agent data. */
   clearUntrustedBuiltinSupportRolesTx(tx: DbOrTx): void {
     const rows = tx
@@ -479,6 +510,14 @@ export class AgentService {
    * converge on one active system Agent.
    */
   ensureBuiltinAgentTx(tx: DbOrTx, input: EnsureBuiltinAgentInput): EnsureBuiltinAgentResult {
+    if (
+      input.builtinRole !== BUILTIN_AGENT_ROLE.DOCTOR &&
+      (this.wasBuiltinAgentRemovedTx(tx, input.builtinRole) ||
+        this.findBuiltinAgentByRoleTx(tx, input.builtinRole, { includeDeleted: true })?.deletedAt != null)
+    ) {
+      throw DataApiErrorFactory.invalidOperation('open built-in Agent', t('agent.builtin.removed'))
+    }
+
     let restored = false
     if (input.builtinRole === BUILTIN_AGENT_ROLE.SUPPORT) {
       this.clearUntrustedBuiltinSupportRolesTx(tx)
@@ -854,7 +893,7 @@ export class AgentService {
       : []
     const result = (() => {
       const [agent] = tx
-        .select({ id: agentsTable.id })
+        .select({ id: agentsTable.id, configuration: agentsTable.configuration })
         .from(agentsTable)
         .where(
           permanent && options.targetState !== 'active'
@@ -902,6 +941,7 @@ export class AgentService {
         .where(and(eq(agentsTable.id, id), isNull(agentsTable.deletedAt)))
         .run()
       pinService.purgeForEntityTx(tx, 'agent', id)
+      this.rememberBuiltinAgentRemovalTx(tx, id, agent.configuration)
       return {
         rowsAffected: result.changes,
         sessionImpact: {
@@ -949,8 +989,13 @@ export class AgentService {
   deleteAgentTx(tx: DbOrTx, id: string): { rowsAffected: number } {
     pinService.purgeForEntityTx(tx, 'agent', id)
     promptService.purgeForTargetTx(tx, 'agent', id)
-    const result = tx.delete(agentsTable).where(eq(agentsTable.id, id)).run()
-    return { rowsAffected: result.changes }
+    const row = tx
+      .delete(agentsTable)
+      .where(eq(agentsTable.id, id))
+      .returning({ configuration: agentsTable.configuration })
+      .get()
+    if (row) this.rememberBuiltinAgentRemovalTx(tx, id, row.configuration)
+    return { rowsAffected: row ? 1 : 0 }
   }
 
   /**
@@ -982,6 +1027,11 @@ export class AgentService {
       .returning()
       .all()
     if (!row) throw DataApiErrorFactory.notFound('Agent', id)
+    const role = removableBuiltinRole(row.id, row.configuration)
+    if (role)
+      tx.delete(appStateTable)
+        .where(eq(appStateTable.key, builtinAgentRemovalKey(role)))
+        .run()
     const database = tx
     const modelName = row.model
       ? (modelService.getNamesByUniqueIdsTx(database, [row.model]).get(row.model) ?? null)

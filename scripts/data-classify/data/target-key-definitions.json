@@ -6,6 +6,13 @@
   },
   "definitions": [
     {
+      "targetKey": "feature.cherryai_guest.enabled",
+      "type": "boolean",
+      "defaultValue": false,
+      "status": "classified",
+      "description": "Allow account-free inference requests to the built-in CherryAI guest service"
+    },
+    {
       "targetKey": "assistant.archive.related_topics",
       "type": "boolean",
       "defaultValue": false,

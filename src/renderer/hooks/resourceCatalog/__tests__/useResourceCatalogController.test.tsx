@@ -411,15 +411,15 @@ describe('useResourceCatalogController', () => {
     const protectedAgent = {
       id: 'agent-protected',
       type: 'agent',
-      name: 'Cherry Assistant',
+      name: 'Cherry Doctor',
       description: '',
       avatar: 'C',
       createdAt: '2026-09-16T00:00:00.000Z',
       updatedAt: '2026-09-16T00:00:00.000Z',
       raw: {
         id: 'agent-protected',
-        name: 'Cherry Assistant',
-        configuration: { builtin_role: 'assistant' }
+        name: 'Cherry Doctor',
+        configuration: { builtin_role: 'doctor' }
       }
     } as unknown as ResourceItem
     const { result } = renderHook(() =>
@@ -433,9 +433,7 @@ describe('useResourceCatalogController', () => {
     })
 
     expect(result.current.dialogs.deleteConfirm).toBeNull()
-    expect(archiveSessionsPopupMocks.show).toHaveBeenCalledWith(
-      expect.objectContaining({ agentName: 'Cherry Assistant' })
-    )
+    expect(archiveSessionsPopupMocks.show).toHaveBeenCalledWith(expect.objectContaining({ agentName: 'Cherry Doctor' }))
     await waitFor(() =>
       expect(controllerMocks.ipcRequest).toHaveBeenCalledWith('ai.agent.sessions.delete', {
         agentId: 'agent-protected'

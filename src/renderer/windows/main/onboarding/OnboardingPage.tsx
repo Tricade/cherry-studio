@@ -36,7 +36,7 @@ import { oauthWithCherryIn } from '@renderer/services/oauth'
 import { toast } from '@renderer/services/toast'
 import { getAppEdition } from '@renderer/utils/appEdition'
 import { isWin } from '@renderer/utils/platform'
-import { isProtectedBuiltinAgentRole } from '@shared/ai/builtinAgent'
+import { isBuiltinAgentRole } from '@shared/ai/builtinAgent'
 import type { OnboardingProviderSetupStatus } from '@shared/data/preference/preferenceTypes'
 import { CHERRYAI_DEFAULT_UNIQUE_MODEL_ID, isManagedCherryProviderId } from '@shared/data/presets/cherryai'
 import type { Model, UniqueModelId } from '@shared/data/types/model'
@@ -147,7 +147,7 @@ export default function OnboardingPage({
       const response = await dataApiService.get('/agents', { query: { limit, page } })
       const officialAgents = response.items.filter(
         (agent) =>
-          isProtectedBuiltinAgentRole(agent.configuration?.builtin_role) &&
+          isBuiltinAgentRole(agent.configuration?.builtin_role) &&
           (agent.model === null || agent.model === CHERRYAI_DEFAULT_UNIQUE_MODEL_ID)
       )
       await Promise.all(

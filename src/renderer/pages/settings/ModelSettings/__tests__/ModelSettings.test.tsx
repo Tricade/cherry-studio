@@ -165,6 +165,16 @@ const createModel = (providerId: string, apiModelId: string): Model => ({
 })
 
 describe('ModelSettings', () => {
+  it('lets the user opt into the disabled CherryAI guest model from the full settings', () => {
+    harness.preferenceValues['feature.cherryai_guest.enabled'] = false
+    render(<ModelSettings />)
+
+    const control = screen.getByRole('button', { name: 'settings.models.cherryai_guest.label' })
+    expect(control).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(control)
+    expect(harness.preferenceSetters['feature.cherryai_guest.enabled']).toHaveBeenCalledWith(true)
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     Object.defineProperty(window, 'matchMedia', {

@@ -1373,7 +1373,7 @@ describe('providerToAiSdkConfig — builder dispatch matrix', () => {
   })
 
   describe('CherryAI routing', () => {
-    it('uses custom fetch to sign chat completions requests', async () => {
+    it('only signs and sends CherryAI guest inference while the user allows it', async () => {
       resolveApiKeyMock.mockReturnValue({ value: '', apiKeySelection: { attribution: 'unknown' } })
       generateSignatureMock.mockReturnValue({
         'X-Client-ID': 'cherry-studio',
@@ -1401,11 +1401,24 @@ describe('providerToAiSdkConfig — builder dispatch matrix', () => {
       })
 
       const config = await providerToAiSdkConfig(provider, model)
-      await (config.providerSettings as { fetch: typeof fetch }).fetch(`${CHERRYAI_API_BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: { Existing: 'yes' },
-        body: JSON.stringify({ model: CHERRYAI_DEFAULT_MODEL_ID })
-      })
+      const send = () =>
+        (config.providerSettings as { fetch: typeof fetch }).fetch(`${CHERRYAI_API_BASE_URL}/chat/completions`, {
+          method: 'POST',
+          headers: { Existing: 'yes' },
+          body: JSON.stringify({ model: CHERRYAI_DEFAULT_MODEL_ID })
+        })
+      await expect(send()).rejects.toThrow()
+      expect(net.fetch).not.toHaveBeenCalled()
+      expect(generateSignatureMock).not.toHaveBeenCalled()
+
+      MockMainPreferenceServiceUtils.setPreferenceValue('feature.cherryai_guest.enabled', true)
+      try {
+        await expect(send()).resolves.toBeInstanceOf(Response)
+      } finally {
+        MockMainPreferenceServiceUtils.setPreferenceValue('feature.cherryai_guest.enabled', false)
+      }
+      await expect(send()).rejects.toThrow()
+      expect(net.fetch).toHaveBeenCalledTimes(1)
 
       expect(config.providerId).toBe('openai-compatible')
       expect(generateSignatureMock).toHaveBeenCalledWith({

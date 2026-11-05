@@ -119,8 +119,8 @@ describe('TopicNamingService', () => {
     mockMainLoggerService.debug.mockClear()
     MockMainPreferenceServiceUtils.setPreferenceValue('topic.naming.enabled', true)
     MockMainPreferenceServiceUtils.setPreferenceValue('feature.quick_assistant.model_id', 'openai::gpt-4o-mini')
-    mocks.getModelByKey.mockReturnValue({ id: 'openai::gpt-4o-mini' })
-    mocks.getProviderByProviderId.mockReturnValue({ authMethods: ['api-key'] })
+    mocks.getModelByKey.mockReturnValue({ id: 'openai::gpt-4o-mini', isEnabled: true })
+    mocks.getProviderByProviderId.mockReturnValue({ authMethods: ['api-key'], isEnabled: true })
     mockRenameInputs()
   })
 
@@ -209,43 +209,44 @@ describe('TopicNamingService', () => {
     expect(mocks.generateText.mock.calls[0][0]).not.toHaveProperty('assistantId')
   })
 
-  it('falls back to the managed CherryAI default when the quick and chat default models are empty', async () => {
+  it('keeps the locally derived chat title when there is no configured naming model', async () => {
     MockMainPreferenceServiceUtils.setPreferenceValue('feature.quick_assistant.model_id', null)
     MockMainPreferenceServiceUtils.setPreferenceValue('chat.default_model_id', null)
 
-    await createService().maybeRenameFromConversationSummary('topic-1', undefined, 'message-1', {
+    const service = createService()
+    service.maybeRenameFromFirstUserMessage('topic-1', 'message-1')
+    await service.maybeRenameFromConversationSummary('topic-1', undefined, 'message-1', {
       role: 'assistant',
       parts: [{ type: 'text', text: 'Assistant response' }]
     } as never)
 
-    expect(mocks.generateText).toHaveBeenCalledWith(
-      expect.objectContaining({
-        uniqueModelId: CHERRYAI_DEFAULT_UNIQUE_MODEL_ID
-      })
-    )
+    expect(mocks.generateText).not.toHaveBeenCalled()
+    expect(mocks.updateTopic).toHaveBeenCalledExactlyOnceWith('topic-1', {
+      name: 'Hello there',
+      isNameManuallyEdited: false
+    })
   })
 
-  it('falls back to the managed CherryAI default when the quick model preference is invalid', async () => {
-    MockMainPreferenceServiceUtils.setPreferenceValue('feature.quick_assistant.model_id', 'bad-value')
-    MockMainPreferenceServiceUtils.setPreferenceValue('chat.default_model_id', 'anthropic::claude-3-haiku')
+  it.each(['bad-value', CHERRYAI_DEFAULT_UNIQUE_MODEL_ID])(
+    'uses the configured chat default instead of %s',
+    async (quickModel) => {
+      MockMainPreferenceServiceUtils.setPreferenceValue('feature.quick_assistant.model_id', quickModel)
+      MockMainPreferenceServiceUtils.setPreferenceValue('chat.default_model_id', 'anthropic::claude-3-haiku')
 
-    await createService().maybeRenameFromConversationSummary('topic-1', undefined, 'message-1', {
-      role: 'assistant',
-      parts: [{ type: 'text', text: 'Assistant response' }]
-    } as never)
+      await createService().maybeRenameFromConversationSummary('topic-1', undefined, 'message-1', {
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'Assistant response' }]
+      } as never)
 
-    expect(mocks.generateText).toHaveBeenCalledWith(
-      expect.objectContaining({
-        uniqueModelId: CHERRYAI_DEFAULT_UNIQUE_MODEL_ID
-      })
-    )
-    expect(mockMainLoggerService.warn).toHaveBeenCalledWith(
-      'Quick assistant model is not usable for topic naming; falling back to managed CherryAI default',
-      { configured: 'bad-value' }
-    )
-  })
+      expect(mocks.generateText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          uniqueModelId: 'anthropic::claude-3-haiku'
+        })
+      )
+    }
+  )
 
-  it('falls back to the managed CherryAI default when the quick model no longer exists', async () => {
+  it('does not send a title request when the configured model no longer exists', async () => {
     MockMainPreferenceServiceUtils.setPreferenceValue('feature.quick_assistant.model_id', 'ghost::missing')
     mocks.getModelByKey.mockImplementation(() => {
       throw new Error('missing model')
@@ -257,15 +258,8 @@ describe('TopicNamingService', () => {
     } as never)
 
     expect(mocks.getModelByKey).toHaveBeenCalledWith('ghost', 'missing')
-    expect(mocks.generateText).toHaveBeenCalledWith(
-      expect.objectContaining({
-        uniqueModelId: CHERRYAI_DEFAULT_UNIQUE_MODEL_ID
-      })
-    )
-    expect(mockMainLoggerService.warn).toHaveBeenCalledWith(
-      'Quick assistant model is not usable for topic naming; falling back to managed CherryAI default',
-      { configured: 'ghost::missing' }
-    )
+    expect(mocks.generateText).not.toHaveBeenCalled()
+    expect(mocks.broadcastToType).not.toHaveBeenCalled()
   })
 
   it('uses the quick assistant model for agent session summary naming', async () => {
@@ -661,36 +655,37 @@ describe('TopicNamingService', () => {
     expect(mocks.broadcast).not.toHaveBeenCalled()
   })
 
-  it('falls back when the quick model points to an external-CLI (agent-only) provider', async () => {
-    MockMainPreferenceServiceUtils.setPreferenceValue('feature.quick_assistant.model_id', 'claude-code::haiku')
-    mocks.getProviderByProviderId.mockReturnValue({ authMethods: ['external-cli'] })
-    mocks.getSession.mockReturnValue({
-      id: 'session-1',
-      agentId: 'agent-1',
-      name: 'common.unnamed',
-      isNameManuallyEdited: false
-    })
-
-    await createService().maybeRenameAgentSession('agent-1', 'session-1', 'User request', {
-      role: 'assistant',
-      parts: [{ type: 'text', text: 'Agent response' }]
-    } as never)
-
-    expect(mocks.getModelByKey).not.toHaveBeenCalledWith('claude-code', 'haiku')
-    expect(mocks.generateText).toHaveBeenCalledWith(
-      expect.objectContaining({
-        uniqueModelId: CHERRYAI_DEFAULT_UNIQUE_MODEL_ID
+  it.each(['claude-code::haiku', CHERRYAI_DEFAULT_UNIQUE_MODEL_ID])(
+    'does not send an Agent title to %s or a guest fallback',
+    async (quickModel) => {
+      MockMainPreferenceServiceUtils.setPreferenceValue('feature.quick_assistant.model_id', quickModel)
+      MockMainPreferenceServiceUtils.setPreferenceValue('chat.default_model_id', CHERRYAI_DEFAULT_UNIQUE_MODEL_ID)
+      MockMainPreferenceServiceUtils.setPreferenceValue('feature.cherryai_guest.enabled', true)
+      mocks.getProviderByProviderId.mockImplementation((id) => ({
+        authMethods: id === 'claude-code' ? ['external-cli'] : ['api-key'],
+        isEnabled: true
+      }))
+      mocks.getSession.mockReturnValue({
+        id: 'session-1',
+        agentId: 'agent-1',
+        name: 'common.unnamed',
+        isNameManuallyEdited: false
       })
-    )
-    expect(mockMainLoggerService.warn).toHaveBeenCalledWith(
-      'Quick assistant model is not usable for topic naming; falling back to managed CherryAI default',
-      { configured: 'claude-code::haiku' }
-    )
-  })
+
+      await createService().maybeRenameAgentSession('agent-1', 'session-1', 'User request', {
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'Agent response' }]
+      } as never)
+
+      expect(mocks.getModelByKey).not.toHaveBeenCalledWith('claude-code', 'haiku')
+      expect(mocks.generateText).not.toHaveBeenCalled()
+      expect(mocks.updateSession).not.toHaveBeenCalled()
+    }
+  )
 
   it('uses an oauth login-based quick model (e.g. Codex/Grok) for topic naming', async () => {
     MockMainPreferenceServiceUtils.setPreferenceValue('feature.quick_assistant.model_id', 'openai-codex::gpt-5')
-    mocks.getProviderByProviderId.mockReturnValue({ authMethods: ['oauth'] })
+    mocks.getProviderByProviderId.mockReturnValue({ authMethods: ['oauth'], isEnabled: true })
 
     await createService().maybeRenameFromConversationSummary('topic-1', 'assistant-1', 'message-1', {
       role: 'assistant',

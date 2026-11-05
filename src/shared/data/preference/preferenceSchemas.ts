@@ -413,6 +413,8 @@ export interface PreferenceSchemas {
     // target-key-definitions/complex/complex
     'feature.binary.tools': PreferenceTypes.CustomToolDefinition[]
     // target-key-definitions/complex/complex
+    'feature.cherryai_guest.enabled': boolean
+    // target-key-definitions/complex/complex
     'feature.code_cli.configs': PreferenceTypes.CodeCliConfigs
     // redux/preprocess/defaultProvider
     'feature.file_processing.default_document_to_markdown': PreferenceTypes.FileProcessorId | null
@@ -838,6 +840,7 @@ export const DefaultPreferences: PreferenceSchemas = {
     'feature.api_gateway.port': 23333,
     'feature.binary.install_settings': { githubMirror: '', githubToken: '', npmRegistry: '', pipIndexUrl: '', verifySignatures: true },
     'feature.binary.tools': [],
+    'feature.cherryai_guest.enabled': false,
     'feature.code_cli.configs': {},
     'feature.file_processing.default_document_to_markdown': null,
     'feature.file_processing.default_image_to_text': null,
@@ -962,7 +965,7 @@ export const DefaultPreferences: PreferenceSchemas = {
 
 /**
  * 生成统计:
- * - 总配置项: 304
+ * - 总配置项: 305
  * - electronStore项: 2
  * - redux项: 173
  * - localStorage项: 0
