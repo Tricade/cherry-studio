@@ -1,0 +1,5 @@
+# Bilingual-pair consistency record (docs/dev/i18n/README.md).
+# After editing either side, update its counterpart and re-record with:
+#   pnpm docs:check-pairing --write .agents/notes/implemented/bug-fix/2026-11-05-windows-tray-and-selection.md
+2026-11-05-windows-tray-and-selection.md: bac3d68d57405c793dd9ca9976313c596780c332
+2026-11-05-windows-tray-and-selection.zh.md: 05938d0f782865bb9ae867c2c8f3ca2e7794ac7d
