@@ -1,0 +1,5 @@
+# Bilingual-pair consistency record (docs/dev/i18n/README.md).
+# After editing either side, update its counterpart and re-record with:
+#   pnpm docs:check-pairing --write .agents/notes/proposed/feature/2026-11-05-agent-account-quota.md
+2026-11-05-agent-account-quota.md: badf037e8a3e3ec0dddeb5fa65584affa603ab58
+2026-11-05-agent-account-quota.zh.md: 8b3a30fd181e0f0335df32f577d62a3286e9e9c7
