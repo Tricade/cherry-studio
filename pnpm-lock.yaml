@@ -1197,7 +1197,7 @@ importers:
         version: 1.3.0
       fast-xml-parser:
         specifier: '>=5.10.1'
-        version: 5.10.1
+        version: 5.12.0
       fetch-socks:
         specifier: 1.3.2
         version: 1.3.2
@@ -1973,7 +1973,7 @@ importers:
         version: 1.0.19
       fast-xml-parser:
         specifier: '>=5.10.1'
-        version: 5.10.1
+        version: 5.12.0
       i18next:
         specifier: ^23.11.5
         version: 23.16.8
@@ -4763,16 +4763,12 @@ packages:
     resolution: {integrity: sha512-V1JJ1WTRUqHHrOSh597hURcMqVKVGL/ea3kv0gSnEdsEZ0/+VyPghM1lMNGc00z7CIQorSvbKpuJkxvuHbvdbg==}
     engines: {node: '>= 16'}
 
-  '@noble/hashes@2.2.0':
-    resolution: {integrity: sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg==}
-    engines: {node: '>= 20.19.0'}
-
   '@noble/hashes@2.4.0':
     resolution: {integrity: sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA==}
     engines: {node: '>= 20.19.0'}
 
-  '@nodable/entities@3.0.0':
-    resolution: {integrity: sha512-8L9xFeTYKhm49xfIypoe2W5wV1m/3Z58kT+7kR9A8OyFxcPduI4VmxaUMQyKYrRjUoLLSXv6EKKID5Tvj9cUVw==}
+  '@nodable/entities@3.1.0':
+    resolution: {integrity: sha512-LsS/DjHr+uDM647Gru/cA8+J3a3HfhttwCKLyuoyN7yXTFCxKBtSgMQBvrW9yNPa2/zDRUNuGPaH5QUFoa4arQ==}
 
   '@node-rs/xxhash-android-arm-eabi@1.7.6':
     resolution: {integrity: sha512-ptmfpFZ8SgTef58Us+0HsZ9BKhyX/gZYbhLkuzPt7qUoMqMSJK85NC7LEgzDgjUiG+S5GahEEQ9/tfh9BVvKhw==}
@@ -10895,11 +10891,11 @@ packages:
   fast-wrap-ansi@0.2.2:
     resolution: {integrity: sha512-7F2Fl+TjRSenLqlU3UjSH0iyqopqoZIu7eZVpEirP2g1GtWa2G/ecEmBdgz31+Mxr+ELclgg6sokpSFIQiZ02Q==}
 
-  fast-xml-builder@1.3.0:
-    resolution: {integrity: sha512-F74cZEdCvuw9P41GAC3rod4X04jjWGM1JPEv/GWSqFTWLsdyMSBMBMlm9Hk3GLBgLBbdBNY8yee0pQh2RBVESQ==}
+  fast-xml-builder@1.3.1:
+    resolution: {integrity: sha512-pIM/1n3ntFXKYrUZwW7QCK0gAW7XY+wzj1YMIV3tLDvPj/V+zTGJK5e3/4WJfwj0qWw2ElNXiTixda/R+3YSug==}
 
-  fast-xml-parser@5.10.1:
-    resolution: {integrity: sha512-IEMIf7298kXuZSRFoGfMYrl7is8LpavODgbNz1cwIudv7KwVFnuU+UsMporfq6PD6aXSlawZlARiA3UywCTfMw==}
+  fast-xml-parser@5.12.0:
+    resolution: {integrity: sha512-/pXxRBtwxY9w8z7YbgsvIPPcPvFDsTbIkWwTQJhzNJPokj+TbN6ftmcv4j/pEQDvOCNnKGDzuk5Bo2oogIOiFg==}
     hasBin: true
 
   fd-slicer@1.1.0:
@@ -11696,8 +11692,8 @@ packages:
     resolution: {integrity: sha512-mE00Gnza5EEB3Ds0HfMyllZzbBrmLOX3vfWoj9A9PEnTfratQ/BcaJOuMhnkhjXvb2+FkY3VuHqtAGpTPmglFQ==}
     engines: {node: '>=18'}
 
-  is-unsafe@2.0.0:
-    resolution: {integrity: sha512-2LdV822R+wmI86unXA93WCFpL6g+av8ynWk0nrHyJqGop5VoocYsSLFgN8jrfalT6iGeLNM4KXuVSsULP53kEA==}
+  is-unsafe@2.0.3:
+    resolution: {integrity: sha512-ZBllczCCO267vgdFb6Tq3pv+LhHaCiGMdr+ZsuL+OopruAg7S+3ZDs1vD0RPC0uSrkjzbraxaGjtX1YBxjPeFQ==}
 
   is-url@1.2.4:
     resolution: {integrity: sha512-ITvGim8FhRiYe4IQ5uHSkj7pVaPDrCTkNd3yq3cV7iZAcJdHTUMPMEHcqSOy9xZ9qFenQCvi+2wjH9a1nXqHww==}
@@ -14517,8 +14513,8 @@ packages:
     resolution: {integrity: sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==}
     engines: {node: '>=8'}
 
-  strnum@2.4.1:
-    resolution: {integrity: sha512-M9eUSMT2dCB2cTNPG7UYj6KuK7RJR2SN2+yCV/fTW3xzTCS6EaGZ5pSMgDIjB7r8zSfTGk+dvvn9rTjpVS9Mwg==}
+  strnum@2.5.1:
+    resolution: {integrity: sha512-UM4nTLWzQiDBseVxUGxN0wJzIk0UU89Qi7pKXz9qISo+lhviJikTuikBsK/oFRlpvYHvSdz0TVoLyQ+sEpYwxA==}
 
   strtok3@10.3.5:
     resolution: {integrity: sha512-ki4hZQfh5rX0QDLLkOCj+h+CVNkqmp/CMf8v8kZpkNVK6jGQooMytqzLZYUVYIZcFZ6yDB70EfD8POcFXiF5oA==}
@@ -16562,7 +16558,7 @@ snapshots:
   '@aws-sdk/xml-builder@3.972.7':
     dependencies:
       '@smithy/types': 4.7.1
-      fast-xml-parser: 5.10.1
+      fast-xml-parser: 5.12.0
       tslib: 2.8.1
 
   '@aws/lambda-invoke-store@0.2.2': {}
@@ -18914,11 +18910,9 @@ snapshots:
 
   '@noble/hashes@1.4.0': {}
 
-  '@noble/hashes@2.2.0': {}
-
   '@noble/hashes@2.4.0': {}
 
-  '@nodable/entities@3.0.0': {}
+  '@nodable/entities@3.1.0': {}
 
   '@node-rs/xxhash-android-arm-eabi@1.7.6':
     optional: true
@@ -23174,7 +23168,7 @@ snapshots:
       '@electron/rebuild': 4.2.0(supports-color@8.1.1)
       '@electron/universal': 2.0.3(supports-color@8.1.1)
       '@malept/flatpak-bundler': 0.4.0(supports-color@8.1.1)
-      '@noble/hashes': 2.2.0
+      '@noble/hashes': 2.4.0
       '@peculiar/webcrypto': 1.7.1
       '@types/fs-extra': 9.0.13
       ajv: 8.20.0
@@ -24694,7 +24688,7 @@ snapshots:
 
   epub@2.1.1:
     dependencies:
-      fast-xml-parser: 5.10.1
+      fast-xml-parser: 5.12.0
       jszip: 3.10.1
 
   err-code@2.0.3: {}
@@ -25227,18 +25221,18 @@ snapshots:
     dependencies:
       fast-string-width: 3.0.2
 
-  fast-xml-builder@1.3.0:
+  fast-xml-builder@1.3.1:
     dependencies:
       path-expression-matcher: 1.6.2
       xml-naming: 0.3.0
 
-  fast-xml-parser@5.10.1:
+  fast-xml-parser@5.12.0:
     dependencies:
-      '@nodable/entities': 3.0.0
-      fast-xml-builder: 1.3.0
-      is-unsafe: 2.0.0
+      '@nodable/entities': 3.1.0
+      fast-xml-builder: 1.3.1
+      is-unsafe: 2.0.3
       path-expression-matcher: 1.6.2
-      strnum: 2.4.1
+      strnum: 2.5.1
       xml-naming: 0.3.0
 
   fd-slicer@1.1.0:
@@ -26290,7 +26284,7 @@ snapshots:
 
   is-unicode-supported@2.1.0: {}
 
-  is-unsafe@2.0.0: {}
+  is-unsafe@2.0.3: {}
 
   is-url@1.2.4: {}
 
@@ -29772,7 +29766,7 @@ snapshots:
 
   strip-json-comments@3.1.1: {}
 
-  strnum@2.4.1:
+  strnum@2.5.1:
     dependencies:
       anynum: 1.0.1
 
@@ -30763,7 +30757,7 @@ snapshots:
       base-64: 1.0.0
       byte-length: 1.0.2
       entities: 6.0.1
-      fast-xml-parser: 5.10.1
+      fast-xml-parser: 5.12.0
       hot-patcher: 2.0.1
       layerr: 3.0.0
       md5: 2.3.0
