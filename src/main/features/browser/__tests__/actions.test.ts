@@ -134,6 +134,35 @@ describe('Browser actions', () => {
     ).toEqual(['mouseMoved'])
   })
 
+  it('restores the previously focused input when a mouse press fails after moving focus', async () => {
+    const composer = dom.window.document.querySelector('input')!
+    const button = dom.window.document.querySelector('button')!
+    composer.focus()
+    const fallback = mock.debugger.sendCommand.getMockImplementation()!
+    mock.debugger.sendCommand.mockImplementation(async (method, params: any) => {
+      if (method === 'Input.dispatchMouseEvent' && params.type === 'mousePressed') {
+        button.focus()
+        throw new Error('mouse press failed')
+      }
+      return fallback(method, params)
+    })
+    const pointer = {
+      move: async () => false,
+      update: () => {},
+      saveInputFocus: async () => {
+        const active = dom.window.document.activeElement
+        return () => {
+          if (active instanceof dom.window.HTMLElement) active.focus()
+        }
+      },
+      pressed: () => {},
+      hide: () => {}
+    }
+
+    await expect(click(session, 'e1', 'left', 1, { pointer })).rejects.toThrow('mouse press failed')
+    expect(dom.window.document.activeElement).toBe(composer)
+  })
+
   it('hit-tests scrolled documents in page coordinates while keeping mouse input in viewport coordinates', async () => {
     const fallback = mock.debugger.sendCommand.getMockImplementation()!
     mock.debugger.sendCommand.mockImplementation(async (method, params: any) => {

@@ -19,7 +19,11 @@ export interface BrowserSessionBinding {
   assertAvailable(): void
   get(): BrowserGuestTarget | undefined
   ensureGuest(signal: AbortSignal, url?: string): Promise<BrowserGuestTarget>
-  focusInput(target: BrowserGuestTarget, options: CommandOptions): Promise<void>
+  focusInput(
+    target: BrowserGuestTarget,
+    options: CommandOptions,
+    captureHostFocus?: true
+  ): Promise<(() => void) | undefined>
   reveal(target: BrowserGuestTarget): void
   cursorMoved?(): void
   trackCursor?(hide: () => void): Disposable
@@ -126,6 +130,17 @@ export class SessionBrowserController extends BrowserPageController {
         return waited
       },
       update: (point) => target.cursor.update(point),
+      saveInputFocus: async (options) => {
+        this.assertAvailable()
+        const restore = await this.binding.focusInput(target, options, true)
+        try {
+          this.assertAvailable()
+          return restore
+        } catch (error) {
+          restore?.()
+          throw error
+        }
+      },
       pressed: () => target.cursor.pressed(),
       hide: () => target.cursor.hide()
     }

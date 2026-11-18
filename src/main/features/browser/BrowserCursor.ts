@@ -12,6 +12,7 @@ export interface BrowserPointerTarget {
 export interface BrowserPointerFeedback {
   move: (point: BrowserPointerTarget, options: CommandOptions) => Promise<boolean>
   update: (point: BrowserPointerTarget) => void
+  saveInputFocus?: (options: CommandOptions) => Promise<(() => void) | undefined>
   pressed: () => void
   hide: () => void
 }

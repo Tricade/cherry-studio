@@ -159,7 +159,12 @@ export class BrowserGuestRegistry implements Disposable {
     return target.cursor
   }
 
-  async focusInput(context: BrowserGuestContext, target: BrowserGuestTarget, options: CommandOptions): Promise<void> {
+  async focusInput(
+    context: BrowserGuestContext,
+    target: BrowserGuestTarget,
+    options: CommandOptions,
+    captureHostFocus?: true
+  ): Promise<(() => void) | undefined> {
     if (this.get(context) !== target) throw new BrowserSessionError('not_found')
     const expiresAt = Math.min(Date.now() + 2000, options.deadline ?? Infinity)
     if (expiresAt <= Date.now()) throw new BrowserSessionError('timeout')
@@ -170,31 +175,44 @@ export class BrowserGuestRegistry implements Disposable {
     ])
     signal.throwIfAborted()
     const requestId = randomUUID()
-    await new Promise<void>((resolve, reject) => {
-      const finish = (error?: unknown) => {
-        this.pendingFocus.delete(requestId)
-        signal.removeEventListener('abort', onAbort)
-        if (error) reject(error)
-        else resolve()
-      }
-      const onAbort = () =>
-        finish(signal.reason?.name === 'TimeoutError' ? new BrowserSessionError('timeout') : signal.reason)
-      this.pendingFocus.set(requestId, { target, finish })
-      signal.addEventListener('abort', onAbort, { once: true })
+    const request = { sessionId: target.sessionId, scope: this.scope, tabId: target.tabId, requestId }
+    const restore = () => {
       try {
-        application.get('IpcApiService').send(target.windowId, 'browser.input.focus_requested', {
-          sessionId: target.sessionId,
-          scope: this.scope,
-          tabId: target.tabId,
-          requestId,
-          expiresAt
-        })
+        if (this.targets.get(target.sessionId) === target)
+          application.get('IpcApiService').send(target.windowId, 'browser.input.restore_requested', request)
       } catch (error) {
-        finish(error)
+        logger.debug('Browser focus owner is unavailable', { error })
       }
-    })
-    signal.throwIfAborted()
-    if (this.get(context) !== target) throw new BrowserSessionError('not_found')
+    }
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const finish = (error?: unknown) => {
+          this.pendingFocus.delete(requestId)
+          signal.removeEventListener('abort', onAbort)
+          if (error) reject(error)
+          else resolve()
+        }
+        const onAbort = () =>
+          finish(signal.reason?.name === 'TimeoutError' ? new BrowserSessionError('timeout') : signal.reason)
+        this.pendingFocus.set(requestId, { target, finish })
+        signal.addEventListener('abort', onAbort, { once: true })
+        try {
+          application.get('IpcApiService').send(target.windowId, 'browser.input.focus_requested', {
+            ...request,
+            expiresAt,
+            ...(captureHostFocus ? { captureHostFocus } : {})
+          })
+        } catch (error) {
+          finish(error)
+        }
+      })
+      signal.throwIfAborted()
+      if (this.get(context) !== target) throw new BrowserSessionError('not_found')
+    } catch (error) {
+      if (captureHostFocus) restore()
+      throw error
+    }
+    return captureHostFocus ? restore : undefined
   }
 
   inputFocused(

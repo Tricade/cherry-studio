@@ -22,7 +22,7 @@ export class AgentBrowserController extends SessionBrowserController {
           throw new BrowserSessionError('not_allowed')
       },
       get: () => registry.get(owner),
-      focusInput: (target, options) => registry.focusInput(owner, target, options),
+      focusInput: (target, options, captureHostFocus) => registry.focusInput(owner, target, options, captureHostFocus),
       ensureGuest: (signal, url) => registry.ensureGuest(owner, signal, url),
       reveal: (target) =>
         application.get('IpcApiService').send(target.windowId, 'browser.pane.open_requested', {
