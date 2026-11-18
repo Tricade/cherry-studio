@@ -7,36 +7,54 @@ const text = z.string().max(2000).nullish()
 const percent = z.number().nonnegative().nullish()
 const unixTime = z.number().int().nonnegative().max(8_640_000_000_000).nullish()
 const codexWindow = z.object({
-  usedPercent: percent,
-  resetsAt: unixTime,
-  windowDurationMins: z.number().positive().nullish()
+  used_percent: percent,
+  reset_at: unixTime,
+  limit_window_seconds: z.number().int().nonnegative().nullish()
 })
-const codexBucket = z.object({
-  limitId: text,
-  limitName: text,
-  normalModelSlug: text,
-  planType: text,
-  primary: codexWindow.nullish(),
-  secondary: codexWindow.nullish(),
-  credits: z.object({ balance: text, hasCredits: z.boolean(), unlimited: z.boolean() }).nullish(),
-  individualLimit: z
-    .object({ limit: z.string(), used: z.string(), remainingPercent: percent, resetsAt: unixTime })
+const codexRateLimit = z.object({
+  allowed: z.boolean().nullish(),
+  primary_window: codexWindow.nullish(),
+  secondary_window: codexWindow.nullish()
+})
+const codexResetCredits = z.object({
+  available_count: z.number().int().nonnegative(),
+  credits: z
+    .array(
+      z.object({
+        id: z.string(),
+        title: text,
+        description: text,
+        status: z.string(),
+        expires_at: z.iso.datetime({ offset: true }).nullish()
+      })
+    )
+    .max(256)
     .nullish()
 })
 const codexResponse = z.object({
-  accountId: text,
-  ordinaryUsageAllowed: z.boolean().nullish(),
-  rateLimits: codexBucket,
-  rateLimitsByLimitId: z.record(z.string(), codexBucket).nullish(),
-  rateLimitResetCredits: z
+  account_id: text,
+  plan_type: text,
+  rate_limit: codexRateLimit.nullish(),
+  additional_rate_limits: z
+    .array(
+      z.object({
+        metered_feature: z.string().min(1),
+        limit_name: text,
+        normal_model_slug: text,
+        rate_limit: codexRateLimit.nullish()
+      })
+    )
+    .max(127)
+    .nullish(),
+  credits: z.object({ balance: text, has_credits: z.boolean(), unlimited: z.boolean() }).nullish(),
+  spend_control: z
     .object({
-      availableCount: z.number().int().nonnegative(),
-      credits: z
-        .array(z.object({ id: z.string(), title: text, description: text, status: z.string(), expiresAt: unixTime }))
-        .max(256)
+      individual_limit: z
+        .object({ limit: z.string(), used: z.string(), remaining_percent: percent, reset_at: unixTime })
         .nullish()
     })
-    .nullish()
+    .nullish(),
+  rate_limit_reset_credits: codexResetCredits.nullish()
 })
 
 const iso = (seconds: number | null | undefined) => (seconds == null ? null : new Date(seconds * 1000).toISOString())
@@ -59,76 +77,86 @@ export function unavailableQuota(
   return { status: 'unavailable', providerId, reason }
 }
 
+export function normalizeCodexResetCredits(input: unknown): AvailableProviderQuota['resetCredits'] {
+  const result = codexResetCredits.safeParse(input)
+  if (!result.success) return null
+  return {
+    availableCount: result.data.available_count,
+    details:
+      result.data.credits?.map((credit) => ({
+        id: credit.id,
+        title: credit.title ?? null,
+        description: credit.description ?? null,
+        status: credit.status,
+        expiresAt: credit.expires_at ? new Date(credit.expires_at).toISOString() : null
+      })) ?? null
+  }
+}
+
 export function normalizeCodexQuota(input: unknown, expectedAccountId: string): ProviderQuotaReport {
   const data = codexResponse.parse(input)
-  if (!data.accountId) return unavailableQuota('openai-codex', 'no-data')
-  if (data.accountId !== expectedAccountId) return unavailableQuota('openai-codex', 'account-mismatch')
-  const buckets = Object.entries(data.rateLimitsByLimitId ?? {})
-  const primaryId = data.rateLimits.limitId ?? 'codex'
-  if (!buckets.some(([id, bucket]) => id === primaryId || bucket.limitId === primaryId))
-    buckets.unshift([primaryId, data.rateLimits])
+  if (data.account_id != null && data.account_id !== expectedAccountId)
+    return unavailableQuota('openai-codex', 'account-mismatch')
+
+  const buckets = new Map([
+    ['codex', { metered_feature: 'codex', limit_name: null, normal_model_slug: null, rate_limit: data.rate_limit }],
+    ...(data.additional_rate_limits ?? []).map((bucket) => [bucket.metered_feature, bucket] as const)
+  ])
   const windows: AvailableProviderQuota['windows'] = []
-  const balances: AvailableProviderQuota['balances'] = []
   for (const [key, bucket] of buckets) {
-    const label = bucket.limitName ?? key
     for (const period of ['primary', 'secondary'] as const) {
-      const window = bucket[period]
+      const window = bucket.rate_limit?.[`${period}_window`]
       if (window)
         windows.push({
           id: `${key}:${period}`,
-          label,
-          scope: bucket.normalModelSlug ? 'model' : 'shared',
-          model: bucket.normalModelSlug ?? null,
-          usedPercent: window.usedPercent ?? null,
-          durationMinutes: window.windowDurationMins ?? null,
-          resetsAt: iso(window.resetsAt)
+          label: bucket.limit_name ?? key,
+          scope: bucket.normal_model_slug ? 'model' : 'shared',
+          model: bucket.normal_model_slug ?? null,
+          usedPercent: window.used_percent ?? null,
+          durationMinutes: window.limit_window_seconds ? Math.ceil(window.limit_window_seconds / 60) : null,
+          resetsAt: iso(window.reset_at)
         })
     }
-    if (bucket.credits)
-      balances.push({
-        ...emptyBalance,
-        id: `${key}:credits`,
-        kind: 'credits',
-        label,
-        balance: bucket.credits.balance ?? null,
-        enabled: bucket.credits.hasCredits,
-        unlimited: bucket.credits.unlimited
-      })
-    if (bucket.individualLimit)
-      balances.push({
-        ...emptyBalance,
-        id: `${key}:spend`,
-        kind: 'spend-control',
-        label,
-        used: bucket.individualLimit.used,
-        limit: bucket.individualLimit.limit,
-        remainingPercent: bucket.individualLimit.remainingPercent ?? null,
-        resetsAt: iso(bucket.individualLimit.resetsAt)
-      })
   }
+
+  const balances: AvailableProviderQuota['balances'] = []
+  if (data.credits)
+    balances.push({
+      ...emptyBalance,
+      id: 'codex:credits',
+      kind: 'credits',
+      label: 'codex',
+      balance: data.credits.balance ?? null,
+      enabled: data.credits.has_credits,
+      unlimited: data.credits.unlimited
+    })
+  const spendLimit = data.spend_control?.individual_limit
+  if (spendLimit)
+    balances.push({
+      ...emptyBalance,
+      id: 'codex:spend',
+      kind: 'spend-control',
+      label: 'codex',
+      used: spendLimit.used,
+      limit: spendLimit.limit,
+      remainingPercent: spendLimit.remaining_percent ?? null,
+      resetsAt: iso(spendLimit.reset_at)
+    })
+
+  const resetCredits = normalizeCodexResetCredits(data.rate_limit_reset_credits)
+  if (!windows.length && !balances.length && !resetCredits && data.rate_limit?.allowed == null)
+    return unavailableQuota('openai-codex', 'no-data')
   return ProviderQuotaReportSchema.parse({
     status: 'available',
     providerId: 'openai-codex',
-    source: 'codex-cli',
+    source: 'codex-oauth',
     accountLabel: expectedAccountId,
-    plan: data.rateLimits.planType ?? null,
+    plan: data.plan_type ?? null,
     fetchedAt: new Date().toISOString(),
-    ordinaryUsageAllowed: data.ordinaryUsageAllowed ?? null,
+    ordinaryUsageAllowed: data.rate_limit?.allowed ?? null,
     windows,
     balances,
-    resetCredits: data.rateLimitResetCredits
-      ? {
-          availableCount: data.rateLimitResetCredits.availableCount,
-          details:
-            data.rateLimitResetCredits.credits?.map((credit) => ({
-              id: credit.id,
-              title: credit.title ?? null,
-              description: credit.description ?? null,
-              status: credit.status,
-              expiresAt: iso(credit.expiresAt)
-            })) ?? null
-        }
-      : null
+    resetCredits
   })
 }
 

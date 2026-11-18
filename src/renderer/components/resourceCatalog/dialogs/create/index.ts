@@ -1,3 +1,4 @@
+export { AgentCreateDialog } from './AgentCreateDialog'
 export {
   getResourceCreateDefaultAvatar,
   ResourceCreateWizard,

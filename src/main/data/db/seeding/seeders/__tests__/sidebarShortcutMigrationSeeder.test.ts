@@ -180,3 +180,39 @@ describe('SidebarShortcutMigrationSeeder', () => {
     expect(readPreference('ui.sidebar.favorites')).toEqual(shortcuts)
   })
 })
+
+describe('ProjectsSidebarSeeder', () => {
+  const dbh = setupTestDatabase()
+  const seeder = seeders.find((candidate) => candidate.name === 'projects-sidebar')!
+
+  it('adds Projects beside Agents on upgrade and respects a later unpin', () => {
+    const key = 'ui.sidebar_shortcut'
+    const current = DefaultPreferences.default[key].filter((item) => item.id !== 'sidebar-shortcut:core.app:projects')
+    const custom = [current[2], current[0], current[1]]
+    const read = () => dbh.db.select().from(preferenceTable).where(eq(preferenceTable.key, key)).get()?.value
+    dbh.db.insert(preferenceTable).values({ key, value: custom }).run()
+
+    const runner = new SeedRunner(dbh.db)
+    runner.runAll([seeder])
+    expect(read()).toEqual([
+      custom[0],
+      custom[1],
+      expect.objectContaining({ id: 'sidebar-shortcut:core.app:projects' }),
+      custom[2]
+    ])
+
+    dbh.db.update(preferenceTable).set({ value: custom }).where(eq(preferenceTable.key, key)).run()
+    runner.runAll([seeder])
+    expect(read()).toEqual(custom)
+  })
+
+  it.each([{ items: [] }, { items: DefaultPreferences.default['ui.sidebar_shortcut'] }])(
+    'preserves an empty sidebar or one that already contains Projects',
+    ({ items }) => {
+      const key = 'ui.sidebar_shortcut'
+      dbh.db.insert(preferenceTable).values({ key, value: items }).run()
+      new SeedRunner(dbh.db).runAll([seeder])
+      expect(dbh.db.select().from(preferenceTable).where(eq(preferenceTable.key, key)).get()?.value).toEqual(items)
+    }
+  )
+})

@@ -7,6 +7,7 @@ import { useIsActiveTab, useTabSelfVisuals } from '@renderer/hooks/tab'
 
 type Props = {
   title: string
+  routePrefix?: '/app/agents' | '/app/projects'
   emoji?: string | null
   /** Image avatar URL; takes precedence over `emoji`. */
   icon?: string
@@ -18,6 +19,7 @@ type Props = {
 
 export function AgentTabRuntime({
   title,
+  routePrefix = '/app/agents',
   emoji,
   icon,
   preserveVisuals,
@@ -31,18 +33,18 @@ export function AgentTabRuntime({
     title,
     emoji,
     icon,
-    routePrefix: '/app/agents',
+    routePrefix,
     preserveVisuals
   })
 
   useCommandHandler('app.sidebar.toggle', onToggleSidebar, { enabled: isActiveTab })
 
   useEffect(() => {
-    if (!isActiveTab) return
+    if (!isActiveTab || routePrefix !== '/app/agents') return
     if (activeSessionId && activeSessionSource === 'query') {
       cacheService.setPersist('ui.agent.last_used_session_id', activeSessionId)
     }
-  }, [isActiveTab, activeSessionId, activeSessionSource])
+  }, [isActiveTab, activeSessionId, activeSessionSource, routePrefix])
 
   return null
 }

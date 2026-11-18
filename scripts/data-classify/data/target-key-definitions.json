@@ -322,6 +322,11 @@
           "type": "shortcut"
         },
         {
+          "id": "sidebar-shortcut:core.app:projects",
+          "target": { "kind": "resource", "locator": { "providerId": "core.app", "resourceId": "projects" } },
+          "type": "shortcut"
+        },
+        {
           "id": "sidebar-shortcut:core.app:assistants",
           "target": { "kind": "resource", "locator": { "providerId": "core.app", "resourceId": "assistants" } },
           "type": "shortcut"

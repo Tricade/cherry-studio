@@ -70,6 +70,20 @@ describe('project ownership and history', () => {
     return agentSessionService.create({ agentId, projectId, name: '', workspace: { type: 'user', workspaceId } })
   }
 
+  it('keeps the coordinator bound to the current project membership', () => {
+    const project = createProject()
+    expect(project.coordinatorAgentId).toBeNull()
+    expect(() => agentProjectService.update(project.id, { coordinatorAgentId: 'outsider' })).toThrow(
+      'Coordinator must belong to this project'
+    )
+    expect(agentProjectService.update(project.id, { coordinatorAgentId: 'planner' }).coordinatorAgentId).toBe('planner')
+    expect(getAgentProjectContext(createSession(project.id), 'planner')?.coordinatorAgentId).toBe('planner')
+    expect(agentProjectService.update(project.id, { instructions: 'Review reports' }).coordinatorAgentId).toBe(
+      'planner'
+    )
+    expect(agentProjectService.update(project.id, { agentIds: ['coder'] }).coordinatorAgentId).toBeNull()
+  })
+
   it('shares explicit resources without changing the reusable agent definitions', () => {
     const project = createProject()
     expect(project.agentIds).toEqual(['coder', 'planner'])

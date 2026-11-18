@@ -13,6 +13,10 @@
         "path": "/app/agents"
       },
       {
+        "id": "projects",
+        "path": "/app/projects"
+      },
+      {
         "id": "assistants",
         "path": "/app/chat"
       },
@@ -57,6 +61,7 @@
       "/app/knowledge",
       "/app/launchpad",
       "/app/notes",
+      "/app/projects",
       "/app/release-notes",
       "/app/translate",
       "/settings/about",

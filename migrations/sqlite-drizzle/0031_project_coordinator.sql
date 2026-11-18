@@ -1,0 +1,1 @@
+ALTER TABLE `agent_project` ADD `coordinator_agent_id` text;

@@ -132,6 +132,7 @@ vi.mock('@renderer/i18n/label', () => ({
     ({
       assistants: 'Chat',
       agents: 'Agent',
+      projects: 'Projects',
       store: 'Library',
       paintings: 'Paintings',
       translate: 'Translate',
@@ -168,6 +169,7 @@ vi.mock('react-i18next', () => ({
           'notes.title': 'Notes',
           'openclaw.title': 'OpenClaw',
           'paintings.title': 'Paintings',
+          'project.title': 'Projects',
           'title.launchpad': 'Launchpad',
           'translate.title': 'Translate'
         }[key] ??
@@ -236,6 +238,7 @@ describe('LaunchpadPage', () => {
       'justify-center'
     )
     expect(screen.getByRole('button', { name: 'Agent' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Projects' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Knowledge' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Manage' })).not.toBeInTheDocument()
   })
@@ -255,6 +258,7 @@ describe('LaunchpadPage', () => {
           'Translate',
           'Chat',
           'Agent',
+          'Projects',
           'Paintings',
           'Library',
           'Mini Apps',
@@ -266,7 +270,7 @@ describe('LaunchpadPage', () => {
         ].includes(label ?? '')
       )
 
-    expect(appLabels.slice(0, 4)).toEqual(['Translate', 'Chat', 'Agent', 'Paintings'])
+    expect(appLabels.slice(0, 4)).toEqual(['Translate', 'Chat', 'Agent', 'Projects'])
   })
 
   it('sorts every app tile and persists to the launchpad app order, not the sidebar favorites', () => {

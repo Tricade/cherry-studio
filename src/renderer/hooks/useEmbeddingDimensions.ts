@@ -5,8 +5,6 @@ import { ipcApi } from '@renderer/ipc'
 import { LOCAL_EMBEDDING_DIMENSIONS, LOCAL_EMBEDDING_UNIQUE_MODEL_ID } from '@shared/data/presets/localEmbedding'
 import { UniqueModelIdSchema } from '@shared/data/types/model'
 
-import { normalizeKnowledgeError } from '../utils/error'
-
 const logger = loggerService.withContext('useEmbeddingDimensions')
 
 const EMBEDDING_DIMENSION_PROBE_TEXT = 'test'
@@ -39,7 +37,7 @@ const fetchEmbeddingDimensions = async (uniqueModelId: string): Promise<number> 
 
     return getEmbeddingDimensions(embeddings)
   } catch (error) {
-    const normalizedError = normalizeKnowledgeError(error)
+    const normalizedError = error instanceof Error ? error : new Error(String(error))
     logger.error('Failed to get embedding dimensions', normalizedError, { uniqueModelId })
     throw normalizedError
   }

@@ -81,6 +81,7 @@ describe('DefaultPreferences', () => {
 
     const sidebarShortcutsDefault: PreferenceSchemas['default']['ui.sidebar_shortcut'] = [
       'agents',
+      'projects',
       'assistants',
       'translate',
       'paintings',

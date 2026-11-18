@@ -9,7 +9,10 @@ import { resolveKnowledgeBaseScope } from '@main/ai/utils/knowledgeScope'
 import type { AgentProjectEntity } from '@shared/data/api/schemas/agentProjects'
 import type { AgentSessionEntity } from '@shared/data/api/schemas/agentSessions'
 
-export type AgentProjectContext = Pick<AgentProjectEntity, 'id' | 'name' | 'instructions' | 'knowledgeBaseIds'>
+export type AgentProjectContext = Pick<
+  AgentProjectEntity,
+  'id' | 'name' | 'instructions' | 'knowledgeBaseIds' | 'coordinatorAgentId'
+>
 
 export function getAgentProjectContext(session: AgentSessionEntity, agentId: string): AgentProjectContext | undefined {
   if (!session.projectId) return undefined
@@ -23,6 +26,7 @@ export function getAgentProjectContext(session: AgentSessionEntity, agentId: str
     id: project.id,
     name: project.name,
     instructions: project.instructions,
+    coordinatorAgentId: project.coordinatorAgentId,
     knowledgeBaseIds: project.knowledgeBaseIds
   }
 }
