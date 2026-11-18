@@ -144,7 +144,8 @@ export class BrowserSessionService extends BaseService {
         : new SessionBrowserController(this, {
             assertAvailable: () => this.assertTopicAvailable(owner.sessionId, owner.ownerId),
             get: () => this.topicBrowser.get(context),
-            focusInput: (target, options) => this.topicBrowser.focusInput(context, target, options),
+            focusInput: (target, options, captureHostFocus) =>
+              this.topicBrowser.focusInput(context, target, options, captureHostFocus),
             ensureGuest: (signal, url) => this.topicBrowser.ensureGuest(context, signal, url),
             reveal: (target) =>
               application

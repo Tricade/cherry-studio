@@ -10,6 +10,59 @@ import { useAgentBrowserGuest } from '../useAgentBrowserGuest'
 
 afterEach(() => vi.restoreAllMocks())
 
+it('restores the chat input from the matching tool click while respecting a later focus change', async () => {
+  let onFocus!: (request: EventPayload<'browser.input.focus_requested'>) => void
+  let onRestore!: (request: EventPayload<'browser.input.restore_requested'>) => void
+  vi.spyOn(ipcApi, 'on').mockImplementation((event, listener) => {
+    if (event === 'browser.input.focus_requested') onFocus = listener
+    if (event === 'browser.input.restore_requested') onRestore = listener
+    return () => {}
+  })
+  vi.spyOn(ipcApi, 'request').mockImplementation(async (route) => {
+    if (route === 'browser.pane.attach') return { tabId: 'tab-1' }
+    return undefined
+  })
+  const guest = Object.assign(document.createElement('webview'), {
+    getWebContentsId: () => 42
+  }) as unknown as WebviewTag
+  const composer = document.createElement('textarea')
+  const search = document.createElement('input')
+  guest.tabIndex = 0
+  composer.value = 'draft message'
+  document.body.append(composer, search, guest)
+  const hook = renderHook(() => useAgentBrowserGuest('session-a', guest, 0, 'topic'))
+  try {
+    await waitFor(() => expect(hook.result.current).toBe('tab-1'))
+    const request = { sessionId: 'session-a', scope: 'topic' as const, tabId: 'tab-1', requestId: 'click-1' }
+    const capture = () => ({ captureHostFocus: true as const, expiresAt: Date.now() + 2000 })
+    composer.focus()
+    composer.setSelectionRange(0, 5)
+    onFocus({ ...request, ...capture() })
+    guest.focus()
+    onRestore({ ...request, requestId: 'different-click' })
+    expect(document.activeElement).toBe(guest)
+    onRestore(request)
+    expect(document.activeElement).toBe(composer)
+    expect(composer.value).toBe('draft message')
+    expect([composer.selectionStart, composer.selectionEnd]).toEqual([0, 5])
+
+    const next = { ...request, requestId: 'click-2' }
+    onFocus({ ...next, ...capture() })
+    search.focus()
+    guest.focus()
+    onRestore(next)
+    expect(document.activeElement).toBe(guest)
+  } finally {
+    hook.unmount()
+    composer.remove()
+    search.remove()
+    guest.remove()
+    await act(async () => {
+      await Promise.resolve()
+    })
+  }
+})
+
 it('keeps the new binding alive when a previous attachment completes after effect cleanup', async () => {
   let binding: string | undefined
   let resolveFirst!: () => void

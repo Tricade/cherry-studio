@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { loggerService } from '@logger'
 import { ipcApi } from '@renderer/ipc'
-import type { InputFor } from '@shared/ipc/types'
+import type { EventPayload, InputFor } from '@shared/ipc/types'
 import { Sequencer } from '@shared/utils/async'
 
 const logger = loggerService.withContext('useAgentBrowserGuest')
@@ -22,18 +22,37 @@ export function useAgentBrowserGuest(
     let cancelled = false
     let attaching = false
     let tabId: string | undefined
+    const ownerDocument = guest.ownerDocument
+    let savedFocus: { element: HTMLElement; requestId: string } | undefined
+    const clearSavedFocus = () => {
+      savedFocus = undefined
+      ownerDocument.removeEventListener('focusin', onHostFocus)
+    }
+    const onHostFocus = (event: FocusEvent) => {
+      if (event.target !== guest && event.target !== savedFocus?.element) clearSavedFocus()
+    }
+    const matches = (request: EventPayload<'browser.input.restore_requested'>) =>
+      request.sessionId === sessionId && request.scope === (scope ?? 'agent') && request.tabId === tabId
     const unsubscribeFocus = ipcApi.on('browser.input.focus_requested', (request) => {
-      if (
-        request.sessionId !== sessionId ||
-        request.scope !== (scope ?? 'agent') ||
-        request.tabId !== tabId ||
-        request.expiresAt <= Date.now()
-      )
-        return
+      if (!matches(request) || request.expiresAt <= Date.now()) return
       let status: InputFor<'browser.input.focused'>['status'] = 'unavailable'
       try {
-        if (guest?.isConnected) {
-          status = guest.closest('[inert]') || guest.ownerDocument.activeElement !== guest ? 'background' : 'focused'
+        if (guest.isConnected) {
+          const activeElement = ownerDocument.activeElement
+          status = guest.closest('[inert]') || activeElement !== guest ? 'background' : 'focused'
+          if (request.captureHostFocus) {
+            clearSavedFocus()
+            if (
+              ownerDocument.hasFocus() &&
+              activeElement instanceof HTMLElement &&
+              (activeElement.isContentEditable ||
+                activeElement instanceof HTMLInputElement ||
+                activeElement instanceof HTMLTextAreaElement)
+            ) {
+              savedFocus = { element: activeElement, requestId: request.requestId }
+              ownerDocument.addEventListener('focusin', onHostFocus)
+            }
+          }
         }
       } catch (error) {
         logger.debug('Browser guest could not receive input focus', { error })
@@ -47,6 +66,14 @@ export function useAgentBrowserGuest(
           status
         })
         .catch((error) => logger.debug('Browser input focus request ended', { error }))
+    })
+    const unsubscribeRestore = ipcApi.on('browser.input.restore_requested', (request) => {
+      if (!matches(request) || savedFocus?.requestId !== request.requestId) return
+      const { element } = savedFocus
+      clearSavedFocus()
+      if (ownerDocument.activeElement === guest && element.isConnected && !element.closest('[inert]')) {
+        element.focus({ preventScroll: true })
+      }
     })
     const detach = (id: string) =>
       ipcApi.request('browser.pane.detach', { sessionId, tabId: id, ...(scope ? { scope } : {}) })
@@ -79,7 +106,9 @@ export function useAgentBrowserGuest(
     attach()
     return () => {
       cancelled = true
+      clearSavedFocus()
       unsubscribeFocus()
+      unsubscribeRestore()
       guest.removeEventListener('dom-ready', attach)
       if (tabId) {
         const detachedId = tabId

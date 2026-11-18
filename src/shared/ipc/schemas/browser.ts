@@ -54,14 +54,19 @@ export const browserRequestSchemas = {
   })
 }
 
+type BrowserFocusRequest = {
+  sessionId: string
+  scope: 'agent' | 'topic'
+  tabId: string
+  requestId: string
+}
+
 export type BrowserEventSchemas = {
-  'browser.input.focus_requested': {
-    sessionId: string
-    scope: 'agent' | 'topic'
-    tabId: string
-    requestId: string
+  'browser.input.focus_requested': BrowserFocusRequest & {
     expiresAt: number
+    captureHostFocus?: true
   }
+  'browser.input.restore_requested': BrowserFocusRequest
   'browser.cursor.state': BrowserCursorState
   'browser.guest.ensure_requested': { sessionId: string; scope?: 'agent' | 'topic'; url?: string }
   'browser.pane.open_requested': { sessionId: string; scope?: 'agent' | 'topic'; url?: string }

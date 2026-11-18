@@ -25,18 +25,27 @@ export async function click(
   }
   session.resolveRef(ref)
   const { x, y } = point
-  await session.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y }, options)
-  if (options.pointer) {
-    const hit = await resolveTarget(session, ref, options)
-    if (hit.occluded || hit.x !== x || hit.y !== y) {
-      options.pointer.hide()
-      throw new BrowserSessionError('occluded')
+  const restoreFocus = await options.pointer?.saveInputFocus?.(options)
+  try {
+    await session.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y }, options)
+    if (options.pointer) {
+      const hit = await resolveTarget(session, ref, options)
+      if (hit.occluded || hit.x !== x || hit.y !== y) {
+        options.pointer.hide()
+        throw new BrowserSessionError('occluded')
+      }
     }
-  }
-  for (let count = 1; count <= clickCount; count++) {
-    session.resolveRef(ref)
-    await session.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button, clickCount: count }, options)
-    await session.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button, clickCount: count }, options)
+    for (let count = 1; count <= clickCount; count++) {
+      session.resolveRef(ref)
+      await session.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button, clickCount: count }, options)
+      await session.send(
+        'Input.dispatchMouseEvent',
+        { type: 'mouseReleased', x, y, button, clickCount: count },
+        options
+      )
+    }
+  } finally {
+    restoreFocus?.()
   }
   options.pointer?.pressed()
   return { occluded: false, synthetic: false }
